@@ -239,6 +239,23 @@ pub struct Theme {
     pub appearance: Appearance,
     /// The colors and other styles for the theme.
     pub styles: ThemeStyles,
+    /// Optional path to a wallpaper image to render behind the editor.
+    pub wallpaper: Option<SharedString>,
+    /// Scale factor (0.0–1.0) for the wallpaper relative to the editor size.
+    /// When set, the image is rendered at this fraction of the editor size, anchored to the bottom-right.
+    /// When None, the image covers the entire editor (default behavior).
+    pub wallpaper_scale: Option<f32>,
+    /// Horizontal offset in pixels applied to the wallpaper's rendered position.
+    /// Positive values shift the image right.
+    pub wallpaper_offset_x: Option<f32>,
+    /// Vertical offset in pixels applied to the wallpaper's rendered position.
+    /// Positive values shift the image down, negative values shift it up.
+    pub wallpaper_offset_y: Option<f32>,
+    /// Corner of the editor the wallpaper is anchored to when `wallpaper_scale` is set.
+    /// Supported: "top-right", "bottom-right" (default when unset).
+    pub wallpaper_anchor: Option<SharedString>,
+    /// Opacity (0.0–1.0) at which the wallpaper is painted. Defaults to 0.25 when unset.
+    pub wallpaper_opacity: Option<f32>,
 }
 
 impl Theme {

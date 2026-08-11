@@ -216,6 +216,14 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
             items: view_items,
         },
         Menu {
+            name: "Themes".into(),
+            disabled: false,
+            items: vec![MenuItem::action(
+                "Browse Themes",
+                zed_actions::OpenThemeBrowser,
+            )],
+        },
+        Menu {
             name: "Go".into(),
             disabled: false,
             items: vec![

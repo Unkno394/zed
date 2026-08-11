@@ -279,6 +279,14 @@ pub struct EditorSettingsContent {
     ///
     /// Default: 100
     pub minimum_split_diff_width: Option<f32>,
+
+    /// Animated wallpaper overlay to render over the editor.
+    ///
+    /// Supported values: "fireflies", null
+    ///
+    /// Default: null
+    #[serde(alias = "particles")]
+    pub wallpaper_animation: Option<String>,
 }
 
 #[derive(

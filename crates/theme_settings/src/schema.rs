@@ -34,6 +34,25 @@ pub struct ThemeContent {
     pub name: String,
     pub appearance: theme::AppearanceContent,
     pub style: settings::ThemeStyleContent,
+    #[serde(default)]
+    pub wallpaper: Option<String>,
+    #[serde(default)]
+    pub wallpaper_scale: Option<f32>,
+    /// Horizontal offset in pixels applied to the wallpaper's rendered position.
+    /// Positive values shift the image right.
+    #[serde(default)]
+    pub wallpaper_offset_x: Option<f32>,
+    /// Vertical offset in pixels applied to the wallpaper's rendered position.
+    /// Positive values shift the image down, negative values shift it up.
+    #[serde(default)]
+    pub wallpaper_offset_y: Option<f32>,
+    /// Corner of the editor the wallpaper is anchored to when `wallpaper_scale` is set.
+    /// Supported: "top-right", "bottom-right" (default when unset).
+    #[serde(default)]
+    pub wallpaper_anchor: Option<String>,
+    /// Opacity (0.0–1.0) at which the wallpaper is painted. Defaults to 0.25 when unset.
+    #[serde(default)]
+    pub wallpaper_opacity: Option<f32>,
 }
 
 /// Returns the syntax style overrides in the [`ThemeContent`].

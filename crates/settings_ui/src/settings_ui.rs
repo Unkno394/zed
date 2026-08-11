@@ -49,8 +49,14 @@ use workspace::{
 };
 use zed_actions::{
     AGENT_SKILLS_SETTINGS_PATH, OpenProjectSettings, OpenSettings, OpenSettingsAt,
+<<<<<<< HEAD
     OpenSettingsAtTarget, OpenSettingsPage,
+=======
+    OpenSettingsAtTarget, OpenThemeBrowser,
+>>>>>>> 94d4aba467 (Add wallpaper rendering, window transparency, and Doki theme collectionAdd wallpaper rendering, window transparency, and Doki theme collection)
 };
+
+pub(crate) const THEME_BROWSER_SETTINGS_PATH: &str = "theme_browser";
 
 use crate::components::{
     EnumVariantDropdown, NumberField, NumberFieldMode, NumberFieldType, SettingsInputField,
@@ -436,6 +442,9 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &OpenSettings, cx| {
         open_settings_editor(None, None, None, cx);
     });
+    cx.on_action(|_: &OpenThemeBrowser, cx| {
+        open_theme_browser(None, cx);
+    });
     cx.on_action(|_: &zed_actions::assistant::OpenSkillCreator, cx| {
         open_skill_creator(pages::SkillCreatorOpenMode::Form, None, cx);
     });
@@ -467,6 +476,10 @@ pub fn init(cx: &mut App) {
             .register_action(|_, _: &OpenSettings, window, cx| {
                 let window_handle = window.window_handle().downcast::<MultiWorkspace>();
                 open_settings_editor(None, None, window_handle, cx);
+            })
+            .register_action(|_, _: &OpenThemeBrowser, window, cx| {
+                let window_handle = window.window_handle().downcast::<MultiWorkspace>();
+                open_theme_browser(window_handle, cx);
             })
             .register_action(|workspace, _: &OpenProjectSettings, window, cx| {
                 let window_handle = window.window_handle().downcast::<MultiWorkspace>();
@@ -602,6 +615,7 @@ fn init_renderers(cx: &mut App) {
         .add_basic_renderer::<settings::FontWeightContent>(render_editable_number_field)
         .add_basic_renderer::<settings::CenteredPaddingSettings>(render_editable_number_field)
         .add_basic_renderer::<settings::InactiveOpacity>(render_editable_number_field)
+        .add_basic_renderer::<settings::WindowOpacity>(render_editable_number_field)
         .add_basic_renderer::<settings::MinimumContrast>(render_editable_number_field)
         .add_basic_renderer::<settings::ShowScrollbar>(render_dropdown)
         .add_basic_renderer::<settings::ScrollbarDiagnostics>(render_dropdown)
@@ -815,6 +829,12 @@ pub fn open_skill_creator(
 ) {
     open_settings_editor_with(workspace_handle, cx, |settings_window, window, cx| {
         settings_window.navigate_to_skill_creator(open_mode, window, cx);
+    });
+}
+
+pub fn open_theme_browser(workspace_handle: Option<WindowHandle<MultiWorkspace>>, cx: &mut App) {
+    open_settings_editor_with(workspace_handle, cx, |settings_window, window, cx| {
+        settings_window.navigate_to_theme_browser(window, cx);
     });
 }
 
@@ -4325,6 +4345,32 @@ impl SettingsWindow {
         }
         self.navigate_to_sub_page(AGENT_SKILLS_SETTINGS_PATH, window, cx);
         self.open_skill_creator_sub_page(open_mode, window, cx);
+    }
+
+    pub fn navigate_to_theme_browser(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<SettingsWindow>,
+    ) {
+        self.sub_page_stack.clear();
+        let theme_browser_page_index = self.pages.iter().position(|page| {
+            page.items.iter().any(|item| {
+                matches!(
+                    item,
+                    SettingsPageItem::SubPageLink(link)
+                        if link.json_path == Some(THEME_BROWSER_SETTINGS_PATH)
+                )
+            })
+        });
+        if let Some(page_index) = theme_browser_page_index
+            && let Some(navbar_entry_index) = self
+                .navbar_entries
+                .iter()
+                .position(|entry| entry.page_index == page_index && entry.is_root)
+        {
+            self.open_navbar_entry_page(navbar_entry_index);
+        }
+        self.navigate_to_sub_page(THEME_BROWSER_SETTINGS_PATH, window, cx);
     }
 
     /// Navigate to a sub-page by its json_path.

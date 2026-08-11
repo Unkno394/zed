@@ -96,6 +96,8 @@ pub struct ThemeSettings {
     pub ui_density: UiDensity,
     /// The amount of fading applied to unnecessary code.
     pub unnecessary_code_fade: f32,
+    /// The opacity applied to the window's background surfaces, independent of the active theme.
+    pub window_opacity: Option<f32>,
 }
 
 /// Returns the name of the default theme for the given [`Appearance`].
@@ -545,6 +547,43 @@ impl ThemeSettings {
         arc_theme
     }
 
+    /// Applies the `window_opacity` setting, if set, to the current theme's background
+    /// surfaces (editor, panels, tabs, status bar, etc), independent of which theme is active.
+    pub fn apply_window_opacity(&self, arc_theme: Arc<Theme>) -> Arc<Theme> {
+        let Some(opacity) = self.window_opacity else {
+            return arc_theme;
+        };
+
+        let mut theme = (*arc_theme).clone();
+        let colors = &mut theme.styles.colors;
+        for background in [
+            &mut colors.background,
+            &mut colors.surface_background,
+            &mut colors.elevated_surface_background,
+            &mut colors.status_bar_background,
+            &mut colors.title_bar_background,
+            &mut colors.title_bar_inactive_background,
+            &mut colors.toolbar_background,
+            &mut colors.tab_bar_background,
+            &mut colors.tab_inactive_background,
+            &mut colors.tab_active_background,
+            &mut colors.panel_background,
+            &mut colors.editor_background,
+            &mut colors.editor_gutter_background,
+            &mut colors.editor_subheader_background,
+            &mut colors.editor_active_line_background,
+            &mut colors.drop_target_background,
+        ] {
+            background.a *= opacity;
+        }
+
+        if theme.styles.window_background_appearance == gpui::WindowBackgroundAppearance::Opaque {
+            theme.styles.window_background_appearance = gpui::WindowBackgroundAppearance::Blurred;
+        }
+
+        Arc::new(theme)
+    }
+
     fn modify_theme(base_theme: &mut Theme, theme_overrides: &settings::ThemeStyleContent) {
         if let Some(window_background_appearance) = theme_overrides.window_background_appearance {
             base_theme.styles.window_background_appearance =
@@ -785,6 +824,9 @@ impl settings::Settings for ThemeSettings {
             icon_theme: icon_theme_selection,
             ui_density: ui_density_from_settings(content.ui_density.unwrap_or_default()),
             unnecessary_code_fade: content.unnecessary_code_fade.unwrap().0.clamp(0.0, 0.9),
+            window_opacity: content
+                .window_opacity
+                .map(|opacity| opacity.0.clamp(0.0, 1.0)),
         }
     }
 }

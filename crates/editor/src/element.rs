@@ -43,7 +43,7 @@ use git::{Oid, blame::BlameEntry, commit::ParsedCommitMessage};
 use gpui::{
     Action, Along, AnyElement, App, AppContext, AvailableSpace, Axis as ScrollbarAxis, BorderStyle,
     Bounds, ClipboardItem, ContentMask, Context, Corners, CursorStyle, DispatchPhase, Edges,
-    Element, ElementInputHandler, Entity, Focusable as _, Font, FontId, FontWeight,
+    Element, ElementInputHandler, Entity, Focusable as _, Font, FontId, FontWeight, Global,
     GlobalElementId, Hitbox, HitboxBehavior, Hsla, InteractiveElement, IntoElement, IsZero,
     ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad,
     ParentElement, Pixels, ScrollHandle, ShapedLine, SharedString, Size,
@@ -246,6 +246,15 @@ pub struct EditorElement {
     style: EditorStyle,
     split_side: Option<SplitSide>,
 }
+
+/// Global tracking the path of the currently decoded wallpaper asset, so that theme changes can
+/// evict the previous one from the asset cache instead of accumulating decoded images forever.
+#[derive(Default)]
+struct WallpaperAssetTracker {
+    current_path: Option<SharedString>,
+}
+
+impl Global for WallpaperAssetTracker {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SplitSide {
@@ -645,6 +654,7 @@ impl EditorElement {
             register_action(editor, window, Editor::insert_uuid_v4);
             register_action(editor, window, Editor::insert_uuid_v7);
             register_action(editor, window, Editor::align_selections);
+            register_action(editor, window, Editor::toggle_fireflies);
             if editor.read(cx).enable_wrap_selections_in_tag(cx) {
                 register_action(editor, window, Editor::wrap_selections_in_tag);
             }
@@ -4895,6 +4905,29 @@ impl EditorElement {
         window.defer_draw(element, final_origin, 2, None);
     }
 
+    /// Tracks which wallpaper image is currently decoded in the asset cache so that switching
+    /// themes evicts the previous one instead of leaving every wallpaper ever viewed decoded in
+    /// memory (large animated GIFs can otherwise pin hundreds of MB per theme indefinitely).
+    ///
+    /// Takes the *current* theme's wallpaper (which may be `None`) so that switching to a theme
+    /// with no wallpaper at all still evicts whatever was previously decoded, instead of only
+    /// evicting when the new theme also happens to set one.
+    fn evict_stale_wallpaper_asset(wallpaper_path: Option<&SharedString>, cx: &mut App) {
+        let previous_path = cx
+            .try_global::<WallpaperAssetTracker>()
+            .and_then(|tracker| tracker.current_path.clone());
+        if previous_path.as_ref() == wallpaper_path {
+            return;
+        }
+        if let Some(old_path) = previous_path {
+            let old_resource = gpui::Resource::from(std::path::PathBuf::from(old_path.as_ref()));
+            cx.remove_asset::<gpui::ImgResourceLoader>(&old_resource);
+        }
+        cx.set_global(WallpaperAssetTracker {
+            current_path: wallpaper_path.cloned(),
+        });
+    }
+
     fn paint_background(&self, layout: &EditorLayout, window: &mut Window, cx: &mut App) {
         window.paint_layer(layout.hitbox.bounds, |window| {
             let scroll_top = layout.position_map.scroll_position.y;
@@ -4904,6 +4937,158 @@ impl EditorElement {
                 layout.position_map.text_hitbox.bounds,
                 self.style.background,
             ));
+
+            if matches!(layout.mode, EditorMode::Full { .. }) {
+                let wallpaper_path = cx.theme().wallpaper.clone();
+                Self::evict_stale_wallpaper_asset(wallpaper_path.as_ref(), cx);
+                if let Some(wallpaper_path) = wallpaper_path {
+                    let resource = gpui::Resource::from(std::path::PathBuf::from(wallpaper_path.as_ref()));
+                    if let Some(Ok(image)) =
+                        window.use_asset::<gpui::ImgResourceLoader>(&resource, cx)
+                    {
+                        if image.frame_count() > 0 {
+                            let editor_bounds = layout.position_map.text_hitbox.bounds;
+                            let image_bounds = if let Some(scale) = cx.theme().wallpaper_scale {
+                                let scale = scale.clamp(0.05, 1.0);
+                                let img_size = image.size(0);
+                                let max_w = editor_bounds.size.width * scale;
+                                let max_h = editor_bounds.size.height * scale;
+                                let aspect = img_size.width.0 as f32 / img_size.height.0 as f32;
+                                let (w, h) = if max_w * (1.0 / aspect) <= max_h {
+                                    (max_w, max_w * (1.0 / aspect))
+                                } else {
+                                    (max_h * aspect, max_h)
+                                };
+                                let x = editor_bounds.origin.x + editor_bounds.size.width - w;
+                                let y = if cx.theme().wallpaper_anchor.as_deref()
+                                    == Some("top-right")
+                                {
+                                    editor_bounds.origin.y
+                                } else {
+                                    editor_bounds.origin.y + editor_bounds.size.height - h
+                                };
+                                gpui::Bounds {
+                                    origin: gpui::Point { x, y },
+                                    size: gpui::Size { width: w, height: h },
+                                }
+                            } else {
+                                gpui::ObjectFit::Cover.get_bounds(
+                                    editor_bounds,
+                                    image.size(0),
+                                )
+                            };
+                            let offset_x = cx.theme().wallpaper_offset_x.unwrap_or(0.0);
+                            let offset_y = cx.theme().wallpaper_offset_y.unwrap_or(0.0);
+                            let image_bounds = if offset_x != 0.0 || offset_y != 0.0 {
+                                gpui::Bounds {
+                                    origin: gpui::Point {
+                                        x: image_bounds.origin.x + gpui::px(offset_x),
+                                        y: image_bounds.origin.y + gpui::px(offset_y),
+                                    },
+                                    size: image_bounds.size,
+                                }
+                            } else {
+                                image_bounds
+                            };
+                            let frame_count = image.frame_count();
+                            let frame_index = if frame_count > 1 {
+                                let total_delay: std::time::Duration = (0..frame_count)
+                                    .map(|i| std::time::Duration::from(image.delay(i)))
+                                    .sum();
+                                if total_delay.is_zero() {
+                                    0
+                                } else {
+                                    let elapsed_in_loop = std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default()
+                                        .as_nanos()
+                                        % total_delay.as_nanos().max(1);
+                                    let mut accumulated = 0u128;
+                                    let mut index = 0;
+                                    for i in 0..frame_count {
+                                        accumulated +=
+                                            std::time::Duration::from(image.delay(i)).as_nanos();
+                                        if elapsed_in_loop < accumulated {
+                                            index = i;
+                                            break;
+                                        }
+                                    }
+                                    index
+                                }
+                            } else {
+                                0
+                            };
+
+                            let opacity = cx.theme().wallpaper_opacity.unwrap_or(0.25);
+                            window.with_element_opacity(Some(opacity), |window| {
+                                window
+                                    .paint_image(
+                                        image_bounds,
+                                        gpui::Corners::default(),
+                                        image,
+                                        frame_index,
+                                        false,
+                                    )
+                                    .log_err();
+                            });
+
+                            if frame_count > 1 {
+                                window.request_animation_frame();
+                            }
+                        }
+                    }
+                }
+
+                let wants_fireflies =
+                    EditorSettings::get_global(cx).wallpaper_animation.as_deref() == Some("fireflies");
+                let has_fireflies = self
+                    .editor
+                    .read(cx)
+                    .firefly_particles
+                    .len() > 0;
+
+                if wants_fireflies && !has_fireflies {
+                    self.editor.update(cx, |editor, cx| {
+                        editor.start_fireflies(cx);
+                    });
+                } else if !wants_fireflies && has_fireflies {
+                    self.editor.update(cx, |editor, _| {
+                        editor.stop_fireflies();
+                    });
+                }
+
+                if wants_fireflies {
+                    let bounds = layout.position_map.text_hitbox.bounds;
+                    let particles = self.editor.read(cx).firefly_particles.clone();
+                    for p in &particles {
+                        let center = gpui::Point::new(
+                            bounds.origin.x + bounds.size.width * p.x,
+                            bounds.origin.y + bounds.size.height * p.y,
+                        );
+
+                        let core_color = gpui::hsla(0.12, 0.95, 0.85, p.opacity);
+                        let mid_color = gpui::hsla(0.12, 0.9, 0.7, p.opacity * 0.45);
+                        let outer_color = gpui::hsla(0.13, 0.85, 0.6, p.opacity * 0.15);
+
+                        for (radius, color) in [
+                            (p.size * 5.0, outer_color),
+                            (p.size * 2.5, mid_color),
+                            (p.size, core_color),
+                        ] {
+                            let r = gpui::px(radius);
+                            let size = gpui::Size { width: r * 2.0, height: r * 2.0 };
+                            window.paint_quad(quad(
+                                gpui::Bounds::centered_at(center, size),
+                                gpui::Corners::all(r),
+                                color,
+                                gpui::Edges::all(px(0.0)),
+                                gpui::transparent_black(),
+                                gpui::BorderStyle::Solid,
+                            ));
+                        }
+                    }
+                }
+            }
 
             if matches!(
                 layout.mode,

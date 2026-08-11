@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use ::settings::{IntoGpui, Settings, SettingsStore};
 use anyhow::{Context as _, Result};
-use gpui::{App, Font, HighlightStyle, Pixels, Refineable, px};
+use gpui::{App, Font, HighlightStyle, Pixels, Refineable, SharedString, px};
 use gpui_util::ResultExt;
 use theme::{
     AccentColors, Appearance, AppearanceContent, DEFAULT_DARK_THEME, DEFAULT_ICON_THEME_NAME,
@@ -100,6 +100,7 @@ pub fn init(themes_to_load: LoadThemes, cx: &mut App) {
         settings.experimental_theme_overrides.clone(),
         settings.theme_overrides.clone(),
     );
+    let mut prev_window_opacity = settings.window_opacity;
 
     cx.observe_global::<SettingsStore>(move |cx| {
         let settings = ThemeSettings::get_global(cx);
@@ -116,6 +117,7 @@ pub fn init(themes_to_load: LoadThemes, cx: &mut App) {
             settings.experimental_theme_overrides.clone(),
             settings.theme_overrides.clone(),
         );
+        let window_opacity = settings.window_opacity;
 
         if buffer_font_size_settings != prev_buffer_font_size_settings {
             prev_buffer_font_size_settings = buffer_font_size_settings;
@@ -147,9 +149,13 @@ pub fn init(themes_to_load: LoadThemes, cx: &mut App) {
             reset_markdown_preview_font_size(cx);
         }
 
-        if theme_name != prev_theme_name || theme_overrides != prev_theme_overrides {
+        if theme_name != prev_theme_name
+            || theme_overrides != prev_theme_overrides
+            || window_opacity != prev_window_opacity
+        {
             prev_theme_name = theme_name;
             prev_theme_overrides = theme_overrides;
+            prev_window_opacity = window_opacity;
             reload_theme(cx);
         }
 
@@ -179,7 +185,8 @@ fn configured_theme(cx: &mut App) -> Arc<Theme> {
                 .unwrap_or_else(|_| themes.get(DEFAULT_DARK_THEME).unwrap())
         }
     };
-    theme_settings.apply_theme_overrides(theme)
+    let theme = theme_settings.apply_theme_overrides(theme);
+    theme_settings.apply_window_opacity(theme)
 }
 
 fn configured_icon_theme(cx: &mut App) -> Arc<theme::IconTheme> {
@@ -368,6 +375,12 @@ pub fn refine_theme(theme: &ThemeContent) -> Theme {
             player: refined_player_colors,
             syntax: syntax_theme,
         },
+        wallpaper: theme.wallpaper.as_deref().map(SharedString::from),
+        wallpaper_scale: theme.wallpaper_scale,
+        wallpaper_offset_x: theme.wallpaper_offset_x,
+        wallpaper_offset_y: theme.wallpaper_offset_y,
+        wallpaper_anchor: theme.wallpaper_anchor.as_deref().map(SharedString::from),
+        wallpaper_opacity: theme.wallpaper_opacity,
     }
 }
 

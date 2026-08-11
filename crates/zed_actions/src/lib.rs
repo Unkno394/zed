@@ -81,6 +81,8 @@ actions!(
         OpenPerformanceProfiler,
         /// Opens the onboarding view.
         OpenOnboarding,
+        /// Opens the theme browser.
+        OpenThemeBrowser,
         /// Shows the auto-update notification for testing.
         ShowUpdateNotification,
     ]

@@ -223,6 +223,7 @@ use project::{
     project_settings::{DiagnosticSeverity, GoToDiagnosticSeverityFilter, ProjectSettings},
 };
 use rand::seq::SliceRandom;
+use rand::Rng;
 use regex::Regex;
 use rpc::{ErrorCode, ErrorExt, proto::PeerId};
 use scroll::{Autoscroll, ScrollAnchor, ScrollManager, SharedScrollAnchor};
@@ -915,6 +916,31 @@ struct ActionFetchReady {
     actions: Rc<[AvailableCodeAction]>,
 }
 
+/// A single firefly particle for the animated particle effect.
+#[derive(Clone)]
+pub struct FireflyParticle {
+    /// Normalized position (0..1 relative to editor bounds).
+    pub x: f32,
+    pub y: f32,
+    /// Current velocity in normalized units per second.
+    pub vx: f32,
+    pub vy: f32,
+    /// Current opacity (0..1), pulsing over time.
+    pub opacity: f32,
+    /// Phase of the opacity pulse (radians).
+    pub pulse_phase: f32,
+    /// Speed of the opacity pulse (radians per second).
+    pub pulse_speed: f32,
+    /// Phase driving the organic wandering movement.
+    pub wander_phase: f32,
+    /// Speed of the wander phase (radians per second).
+    pub wander_speed: f32,
+    /// Radius in pixels.
+    pub size: f32,
+    /// Base color as (r, g, b) in 0..1.
+    pub color: (f32, f32, f32),
+}
+
 /// Zed's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
 ///
 /// See the [module level documentation](self) for more information.
@@ -1168,6 +1194,8 @@ pub struct Editor {
     sticky_headers_task: Task<()>,
     sticky_headers: Option<Vec<OutlineItem<Anchor>>>,
     pub(crate) colorize_brackets_task: Task<()>,
+    pub firefly_particles: Vec<FireflyParticle>,
+    firefly_task: Option<Task<()>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -2483,6 +2511,8 @@ impl Editor {
             sticky_headers_task: Task::ready(()),
             sticky_headers: None,
             colorize_brackets_task: Task::ready(()),
+            firefly_particles: Vec::new(),
+            firefly_task: None,
         };
 
         if let Some(project) = editor.project.clone() {
@@ -11549,6 +11579,115 @@ fn starting_row(selection: &Selection<Point>, display_map: &DisplaySnapshot) -> 
     } else {
         MultiBufferRow(selection.start.row)
     }
+}
+
+impl Editor {
+    pub fn toggle_fireflies(
+        &mut self,
+        _: &crate::ToggleFireflies,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let currently_on =
+            EditorSettings::get_global(cx).wallpaper_animation.as_deref() == Some("fireflies");
+        let Some(workspace) = self.workspace() else {
+            return;
+        };
+        let fs = workspace.read(cx).app_state().fs.clone();
+        let new_value = if currently_on {
+            None
+        } else {
+            Some("fireflies".to_string())
+        };
+        update_settings_file(fs, cx, move |settings, _| {
+            settings.editor.wallpaper_animation = new_value;
+        });
+    }
+
+    pub fn start_fireflies(&mut self, cx: &mut Context<Self>) {
+        if self.firefly_particles.is_empty() {
+            let mut rng = rand::thread_rng();
+            self.firefly_particles = (0..35)
+                .map(|_| {
+                    let hue = rng.gen_range(0.08f32..0.18f32);
+                    let (r, g, b) = hsl_to_rgb(hue, 0.9, 0.75);
+                    FireflyParticle {
+                        x: rng.gen_range(0.0f32..1.0f32),
+                        y: rng.gen_range(0.0f32..1.0f32),
+                        vx: rng.gen_range(-0.015f32..0.015f32),
+                        vy: rng.gen_range(-0.015f32..0.015f32),
+                        opacity: rng.gen_range(0.0f32..1.0f32),
+                        pulse_phase: rng.gen_range(0.0f32..std::f32::consts::TAU),
+                        pulse_speed: rng.gen_range(0.8f32..2.0f32),
+                        wander_phase: rng.gen_range(0.0f32..std::f32::consts::TAU),
+                        wander_speed: rng.gen_range(0.3f32..0.9f32),
+                        size: rng.gen_range(1.5f32..3.5f32),
+                        color: (r, g, b),
+                    }
+                })
+                .collect();
+        }
+        self.firefly_task = Some(cx.spawn(async move |this, cx| loop {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(33))
+                .await;
+            if this
+                .update(cx, |editor, cx| {
+                    editor.tick_fireflies(1.0 / 30.0);
+                    cx.notify();
+                })
+                .is_err()
+            {
+                break;
+            }
+        }));
+    }
+
+    pub fn stop_fireflies(&mut self) {
+        self.firefly_task = None;
+        self.firefly_particles.clear();
+    }
+
+    fn tick_fireflies(&mut self, dt: f32) {
+        for p in &mut self.firefly_particles {
+            p.pulse_phase += p.pulse_speed * dt;
+            p.opacity = (p.pulse_phase.sin() * 0.5 + 0.5) * 0.85 + 0.05;
+
+            p.wander_phase += p.wander_speed * dt;
+            p.vx += p.wander_phase.sin() * 0.004 * dt;
+            p.vy += (p.wander_phase * 1.3).cos() * 0.004 * dt;
+
+            let max_speed = 0.025f32;
+            let speed = (p.vx * p.vx + p.vy * p.vy).sqrt();
+            if speed > max_speed {
+                p.vx = p.vx / speed * max_speed;
+                p.vy = p.vy / speed * max_speed;
+            }
+
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+
+            if p.x < 0.0 { p.x += 1.0; }
+            if p.x > 1.0 { p.x -= 1.0; }
+            if p.y < 0.0 { p.y += 1.0; }
+            if p.y > 1.0 { p.y -= 1.0; }
+        }
+    }
+}
+
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
+    let m = l - c / 2.0;
+    let (r, g, b) = match (h * 6.0) as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    (r + m, g + m, b + m)
 }
 
 fn ending_row(next_selection: &Selection<Point>, display_map: &DisplaySnapshot) -> MultiBufferRow {

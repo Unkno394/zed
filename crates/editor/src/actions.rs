@@ -915,6 +915,8 @@ actions!(
         ToggleSelectionMenu,
         /// Toggles soft wrap mode.
         ToggleSoftWrap,
+        /// Toggles the fireflies particle effect over the editor.
+        ToggleFireflies,
         /// Toggles the tab bar display.
         ToggleTabBar,
         /// Transposes characters around cursor.

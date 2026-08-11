@@ -871,6 +871,37 @@ fn appearance_page() -> SettingsPage {
         ]
     }
 
+    fn theme_browser_section() -> [SettingsPageItem; 3] {
+        [
+            SettingsPageItem::SectionHeader("Window Transparency"),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Window Opacity",
+                description: "Opacity of the window's background surfaces (editor, panels, tabs, status bar), from 0.0 (see-through) to 1.0 (opaque). Applies on top of the active theme.",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("window_opacity"),
+                    pick: |settings_content| settings_content.theme.window_opacity.as_ref(),
+                    write: |settings_content, value, _| {
+                        settings_content.theme.window_opacity = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+            SettingsPageItem::SubPageLink(SubPageLink {
+                title: "Browse Themes".into(),
+                r#type: Default::default(),
+                description: Some(
+                    "Browse installed themes grouped by wallpaper, with previews.".into(),
+                ),
+                json_path: Some(crate::THEME_BROWSER_SETTINGS_PATH),
+                in_json: false,
+                files: USER,
+                render: crate::pages::render_theme_browser_page,
+            }),
+        ]
+    }
+
     fn buffer_font_section() -> [SettingsPageItem; 7] {
         [
             SettingsPageItem::SectionHeader("Buffer Font"),
@@ -1516,6 +1547,7 @@ fn appearance_page() -> SettingsPage {
 
     let items: Box<[SettingsPageItem]> = concat_sections!(
         theme_section(),
+        theme_browser_section(),
         buffer_font_section(),
         ui_font_section(),
         agent_panel_font_section(),

@@ -241,6 +241,13 @@ pub struct ThemeSettingsContent {
     #[schemars(range(min = 0.0, max = 0.9))]
     pub unnecessary_code_fade: Option<CodeFade>,
 
+    /// The opacity of the window's background surfaces (editor, panels, tabs, status bar, etc),
+    /// from 0.0 (fully see-through) to 1.0 (fully opaque). Applies on top of whichever theme
+    /// is active, without needing to edit the theme itself. Requires OS compositor support to
+    /// see the desktop/wallpaper through the window; when unset, the window is fully opaque.
+    #[schemars(range(min = 0.0, max = 1.0))]
+    pub window_opacity: Option<WindowOpacity>,
+
     /// EXPERIMENTAL: Overrides for the current theme.
     ///
     /// These values will override the ones on the current theme specified in `theme`.
@@ -304,6 +311,37 @@ impl Display for CodeFade {
 }
 
 impl From<f32> for CodeFade {
+    fn from(x: f32) -> Self {
+        Self(x)
+    }
+}
+
+/// The opacity applied to the window's background surfaces. 0.0 is fully see-through,
+/// 1.0 is fully opaque.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    PartialOrd,
+    derive_more::FromStr,
+)]
+#[serde(transparent)]
+pub struct WindowOpacity(
+    #[serde(serialize_with = "serialize_f32_with_two_decimal_places")] pub f32,
+);
+
+impl Display for WindowOpacity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.2}", self.0)
+    }
+}
+
+impl From<f32> for WindowOpacity {
     fn from(x: f32) -> Self {
         Self(x)
     }

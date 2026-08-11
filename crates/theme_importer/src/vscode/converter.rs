@@ -63,6 +63,12 @@ impl VsCodeThemeConverter {
                 players: Vec::new(),
                 syntax: syntax_theme,
             },
+            wallpaper: None,
+            wallpaper_scale: None,
+            wallpaper_offset_x: None,
+            wallpaper_offset_y: None,
+            wallpaper_anchor: None,
+            wallpaper_opacity: None,
         })
     }
 

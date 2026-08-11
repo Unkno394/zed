@@ -1,20 +1,50 @@
-# Generated from xtask::workflows::release
-# Rebuild with `cargo xtask workflows`.
-name: release
-env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: '1'
+name: Release
+
+# Builds Linux and macOS binaries whenever a tag matching `v*` (e.g. v0.1.0)
+# is pushed, packages them with the repo's own bundling scripts
+# (script/bundle-linux, script/bundle-mac), and publishes them to a GitHub
+# Release with auto-generated release notes.
+#
+# This replaces upstream Zed's release.yml, which only runs for the
+# zed-industries/zed-extensions orgs, depends on their self-hosted
+# "namespace-profile-*" runners, and uploads to their own CDN/Sentry/signing
+# infrastructure — none of which exists for this fork. This workflow uses
+# plain GitHub-hosted runners and uploads straight to the GitHub Release.
+#
+# macOS builds are ad-hoc signed only (no Apple Developer certificate is
+# configured), so the .dmg will trigger a Gatekeeper "unidentified
+# developer" warning on first launch — right-click (or control-click) the
+# app and choose Open once to bypass it.
+#
+# Windows builds are unsigned for the same reason (no Azure Trusted Signing
+# certificate configured) — script/bundle-windows.ps1 requires those secrets
+# whenever the `CI` env var is set, which GitHub Actions sets by default, so
+# the windows job clears `CI` just for the build step to skip that check and
+# produce an unsigned .exe. Windows SmartScreen will show an "unrecognized
+# app" warning on first launch — click "More info" -> "Run anyway".
+
 on:
   push:
     tags:
+<<<<<<< HEAD
     - v*
 permissions:
   contents: read
+=======
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+>>>>>>> 94d4aba467 (Add wallpaper rendering, window transparency, and Doki theme collectionAdd wallpaper rendering, window transparency, and Doki theme collection)
 jobs:
-  run_tests_mac:
-    if: (github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions')
-    runs-on: namespace-profile-mac-large
+  linux-x86_64:
+    runs-on: ubuntu-22.04
     steps:
+<<<<<<< HEAD
     - name: steps::checkout_repo
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       with:
@@ -779,83 +809,114 @@ jobs:
     runs-on: namespace-profile-2x4-ubuntu-2404
     permissions:
       contents: write
+=======
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force || true
+
+      - name: Install Linux build dependencies
+        run: ./script/linux
+
+      - name: Download WASI SDK
+        run: ./script/download-wasi-sdk
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build and package
+        run: ./script/bundle-linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: target/release/zed-*-linux-*.tar.gz
+          if-no-files-found: error
+
+  linux-aarch64:
+    runs-on: ubuntu-22.04-arm
+>>>>>>> 94d4aba467 (Add wallpaper rendering, window transparency, and Doki theme collectionAdd wallpaper rendering, window transparency, and Doki theme collection)
     steps:
-    - name: release::validate_release_assets
-      run: |
-        EXPECTED_ASSETS='["Zed-aarch64.dmg", "Zed-x86_64.dmg", "zed-linux-aarch64.tar.gz", "zed-linux-x86_64.tar.gz", "bwrap-linux-aarch64.gz", "bwrap-linux-x86_64.gz", "Zed-x86_64.exe", "Zed-aarch64.exe", "zed-remote-server-macos-aarch64.gz", "zed-remote-server-macos-x86_64.gz", "zed-remote-server-linux-aarch64.gz", "zed-remote-server-linux-x86_64.gz", "zed-remote-server-windows-aarch64.zip", "zed-remote-server-windows-x86_64.zip"]'
-        TAG="$GITHUB_REF_NAME"
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        ACTUAL_ASSETS=$(gh release view "$TAG" --repo=zed-industries/zed --json assets -q '[.assets[].name]')
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android \
+            /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force || true
 
-        MISSING_ASSETS=$(echo "$EXPECTED_ASSETS" | jq -r --argjson actual "$ACTUAL_ASSETS" '. - $actual | .[]')
+      - name: Install Linux build dependencies
+        run: ./script/linux
 
-        if [ -n "$MISSING_ASSETS" ]; then
-            echo "Error: The following assets are missing from the release:"
-            echo "$MISSING_ASSETS"
-            exit 1
-        fi
+      - name: Download WASI SDK
+        run: ./script/download-wasi-sdk
 
-        echo "All expected assets are present in the release."
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  release_compliance_check:
-    needs:
-    - upload_release_assets
-    - compliance_check
-    runs-on: namespace-profile-8x16-ubuntu-2204
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build and package
+        run: ./script/bundle-linux
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-aarch64
+          path: target/release/zed-*-linux-*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
     steps:
-    - name: steps::checkout_repo
-      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
-      with:
-        clean: false
-        fetch-depth: 0
-        ref: ${{ github.ref }}
-    - name: steps::cache_rust_dependencies_namespace
-      uses: namespacelabs/nscloud-cache-action@a90bb5d4b27522ce881c6e98eebd7d7e6d1653f9
-      with:
-        cache: rust
-        path: ~/.rustup
-    - id: run-compliance-check
-      name: release::add_compliance_steps::run_compliance_check
-      run: |
-        cargo xtask compliance version "$GITHUB_REF_NAME" --report-path "compliance-report-${GITHUB_REF_NAME}.md"
-      env:
-        GITHUB_APP_ID: ${{ secrets.ZED_ZIPPY_APP_ID }}
-        GITHUB_APP_KEY: ${{ secrets.ZED_ZIPPY_APP_PRIVATE_KEY }}
-    - name: run_bundling::upload_artifact
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: compliance-report-${{ github.ref_name }}.md
-        path: compliance-report-${{ github.ref_name }}.md
-        if-no-files-found: error
-        overwrite: true
-    - name: send_compliance_slack_notification
-      if: ${{ failure() || needs.compliance_check.outputs.outcome != 'success' }}
-      run: |
-        if [ "$COMPLIANCE_OUTCOME" == "success" ]; then
-            STATUS="✅ Compliance check passed for $COMPLIANCE_TAG"
-            MESSAGE=$(printf "%s\n\nReport: %s" "$STATUS" "$ARTIFACT_URL")
-        else
-            STATUS="❌ Compliance check failed for $COMPLIANCE_TAG"
-            MESSAGE=$(printf "%s\n\nReport: %s\nPRs needing review: %s" "$STATUS" "$ARTIFACT_URL" "https://github.com/zed-industries/zed/pulls?q=is%3Apr+is%3Aclosed+label%3A%22PR+state%3Aneeds+review%22")
-        fi
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        curl -X POST -H 'Content-type: application/json' \
-            --data "$(jq -n --arg text "$MESSAGE" '{"text": $text}')" \
-            "$SLACK_WEBHOOK"
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_WORKFLOW_FAILURES }}
-        COMPLIANCE_OUTCOME: ${{ steps.run-compliance-check.outcome }}
-        COMPLIANCE_TAG: ${{ github.ref_name }}
-        ARTIFACT_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
-  auto_release_preview:
-    needs:
-    - validate_release_assets
-    - release_compliance_check
-    if: startsWith(github.ref, 'refs/tags/v') && endsWith(github.ref, '-pre')
-    runs-on: namespace-profile-2x4-ubuntu-2404
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build and package
+        run: ./script/bundle-mac ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/*.dmg
+          if-no-files-found: error
+
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    runs-on: windows-2022
     steps:
+<<<<<<< HEAD
     - id: generate-token
       name: steps::authenticate_as_zippy
       uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859
@@ -876,154 +937,50 @@ jobs:
       run: |
         tag="$GITHUB_REF_NAME"
         release_published=false
+=======
+      - name: Checkout
+        uses: actions/checkout@v4
+>>>>>>> 94d4aba467 (Add wallpaper rendering, window transparency, and Doki theme collectionAdd wallpaper rendering, window transparency, and Doki theme collection)
 
-        if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-pre$ ]]; then
-            echo "::error::expected preview release tag in the form vMAJOR.MINOR.PATCH-pre, got $tag"
-            exit 1
-        fi
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: |
+          rustup show
+          if ("${{ matrix.arch }}" -eq "aarch64") {
+            rustup target add aarch64-pc-windows-msvc
+          }
 
-        major="${BASH_REMATCH[1]}"
-        minor="${BASH_REMATCH[2]}"
-        should_release=true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
-        released_preview="$(script/get-released-version preview)"
-        if [[ -z "$released_preview" || "$released_preview" == "null" ]]; then
-            echo "::error::could not determine released preview version"
-            exit 1
-        fi
+      - name: Build and package
+        shell: pwsh
+        # Clearing CI skips script/bundle-windows.ps1's Azure Trusted Signing
+        # check (see the note at the top of this file) — the resulting .exe
+        # is unsigned.
+        run: |
+          $env:CI = $null
+          ./script/bundle-windows.ps1 -Architecture ${{ matrix.arch }}
 
-        released_preview_major="$(echo "$released_preview" | cut -d. -f1)"
-        released_preview_minor="$(echo "$released_preview" | cut -d. -f2)"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: target/Zed-${{ matrix.arch }}.exe
+          if-no-files-found: error
 
-        if [[ "$released_preview_major" != "$major" || "$released_preview_minor" != "$minor" ]]; then
-            should_release=false
-            echo "Leaving $tag as a draft because it is the first preview release for v${major}.${minor}.x"
-        fi
-
-        if [[ "$should_release" == "true" ]]; then
-            gh release edit "$tag" --repo=zed-industries/zed --draft=false
-            release_published=true
-        fi
-
-        echo "release_published=$release_published" >> "$GITHUB_OUTPUT"
-      env:
-        GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
-    outputs:
-      release_published: ${{ steps.auto-release-preview.outputs.release_published }}
-  push_release_update_notification:
-    needs:
-    - create_draft_release
-    - upload_release_assets
-    - validate_release_assets
-    - release_compliance_check
-    - auto_release_preview
-    - run_tests_mac
-    - run_tests_linux
-    - run_tests_windows
-    - clippy_mac
-    - clippy_linux
-    - clippy_windows
-    - check_scripts
-    - bundle_linux_aarch64
-    - bundle_linux_x86_64
-    - build_static_bwrap_linux_aarch64
-    - build_static_bwrap_linux_x86_64
-    - bundle_mac_aarch64
-    - bundle_mac_x86_64
-    - bundle_windows_aarch64
-    - bundle_windows_x86_64
-    if: always()
-    runs-on: namespace-profile-2x4-ubuntu-2404
+  release:
+    needs: [linux-x86_64, linux-aarch64, macos, windows]
+    runs-on: ubuntu-latest
     steps:
-    - id: generate-webhook-message
-      name: release::generate_slack_message
-      run: |
-        MESSAGE=$(if [ "$DRAFT_RESULT" == "failure" ]; then
-            echo "❌ Draft release creation failed for $TAG: $RUN_URL"
-        else
-            RELEASE_URL=$(gh release view "$TAG" --repo=zed-industries/zed --json url -q '.url')
-            if [ "$UPLOAD_RESULT" == "failure" ]; then
-                echo "❌ Release asset upload failed for $TAG: $RELEASE_URL"
-            elif [ "$UPLOAD_RESULT" == "cancelled" ] || [ "$UPLOAD_RESULT" == "skipped" ]; then
-                FAILED_JOBS=""
-                if [ "$RESULT_RUN_TESTS_MAC" == "failure" ];then FAILED_JOBS="$FAILED_JOBS run_tests_mac"; fi
-                if [ "$RESULT_RUN_TESTS_LINUX" == "failure" ];then FAILED_JOBS="$FAILED_JOBS run_tests_linux"; fi
-                if [ "$RESULT_RUN_TESTS_WINDOWS" == "failure" ];then FAILED_JOBS="$FAILED_JOBS run_tests_windows"; fi
-                if [ "$RESULT_CLIPPY_MAC" == "failure" ];then FAILED_JOBS="$FAILED_JOBS clippy_mac"; fi
-                if [ "$RESULT_CLIPPY_LINUX" == "failure" ];then FAILED_JOBS="$FAILED_JOBS clippy_linux"; fi
-                if [ "$RESULT_CLIPPY_WINDOWS" == "failure" ];then FAILED_JOBS="$FAILED_JOBS clippy_windows"; fi
-                if [ "$RESULT_CHECK_SCRIPTS" == "failure" ];then FAILED_JOBS="$FAILED_JOBS check_scripts"; fi
-                if [ "$RESULT_BUNDLE_LINUX_AARCH64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_linux_aarch64"; fi
-                if [ "$RESULT_BUNDLE_LINUX_X86_64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_linux_x86_64"; fi
-                if [ "$RESULT_BUILD_STATIC_BWRAP_LINUX_AARCH64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS build_static_bwrap_linux_aarch64"; fi
-                if [ "$RESULT_BUILD_STATIC_BWRAP_LINUX_X86_64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS build_static_bwrap_linux_x86_64"; fi
-                if [ "$RESULT_BUNDLE_MAC_AARCH64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_mac_aarch64"; fi
-                if [ "$RESULT_BUNDLE_MAC_X86_64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_mac_x86_64"; fi
-                if [ "$RESULT_BUNDLE_WINDOWS_AARCH64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_windows_aarch64"; fi
-                if [ "$RESULT_BUNDLE_WINDOWS_X86_64" == "failure" ];then FAILED_JOBS="$FAILED_JOBS bundle_windows_x86_64"; fi
-                FAILED_JOBS=$(echo "$FAILED_JOBS" | xargs)
-                if [ "$UPLOAD_RESULT" == "cancelled" ]; then
-                    if [ -n "$FAILED_JOBS" ]; then
-                        echo "❌ Release job for $TAG was cancelled, most likely because tests \`$FAILED_JOBS\` failed: $RUN_URL"
-                    else
-                        echo "❌ Release job for $TAG was cancelled: $RUN_URL"
-                    fi
-                else
-                    if [ -n "$FAILED_JOBS" ]; then
-                        echo "❌ Tests \`$FAILED_JOBS\` for $TAG failed: $RUN_URL"
-                    else
-                        echo "❌ Tests for $TAG failed: $RUN_URL"
-                    fi
-                fi
-            elif [ "$COMPLIANCE_RESULT" == "failure" ]; then
-                # We already notify within that job
-                echo ""
-            elif [ "$VALIDATE_RESULT" == "failure" ]; then
-                echo "❌ Release validation failed for $TAG: missing assets: $RUN_URL"
-            elif [ "$AUTO_RELEASE_RESULT" == "failure" ]; then
-                echo "❌ Auto release failed for $TAG: $RUN_URL"
-            elif [ "$AUTO_RELEASE_RESULT" == "success" ] && [ "$AUTO_RELEASE_PUBLISHED" == "true" ]; then
-                echo "✅ Release $TAG was auto-released successfully: $RELEASE_URL"
-            else
-                echo "👀 Release $TAG sitting freshly baked in the oven and waiting to be published: $RELEASE_URL"
-            fi
-        fi
-        )
-        echo "message=$MESSAGE" >> "$GITHUB_OUTPUT"
-      env:
-        GH_TOKEN: ${{ github.token }}
-        DRAFT_RESULT: ${{ needs.create_draft_release.result }}
-        UPLOAD_RESULT: ${{ needs.upload_release_assets.result }}
-        VALIDATE_RESULT: ${{ needs.validate_release_assets.result }}
-        COMPLIANCE_RESULT: ${{ needs.release_compliance_check.result }}
-        AUTO_RELEASE_RESULT: ${{ needs.auto_release_preview.result }}
-        AUTO_RELEASE_PUBLISHED: ${{ needs.auto_release_preview.outputs.release_published }}
-        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        TAG: ${{ github.ref_name }}
-        RESULT_RUN_TESTS_MAC: ${{ needs.run_tests_mac.result }}
-        RESULT_RUN_TESTS_LINUX: ${{ needs.run_tests_linux.result }}
-        RESULT_RUN_TESTS_WINDOWS: ${{ needs.run_tests_windows.result }}
-        RESULT_CLIPPY_MAC: ${{ needs.clippy_mac.result }}
-        RESULT_CLIPPY_LINUX: ${{ needs.clippy_linux.result }}
-        RESULT_CLIPPY_WINDOWS: ${{ needs.clippy_windows.result }}
-        RESULT_CHECK_SCRIPTS: ${{ needs.check_scripts.result }}
-        RESULT_BUNDLE_LINUX_AARCH64: ${{ needs.bundle_linux_aarch64.result }}
-        RESULT_BUNDLE_LINUX_X86_64: ${{ needs.bundle_linux_x86_64.result }}
-        RESULT_BUILD_STATIC_BWRAP_LINUX_AARCH64: ${{ needs.build_static_bwrap_linux_aarch64.result }}
-        RESULT_BUILD_STATIC_BWRAP_LINUX_X86_64: ${{ needs.build_static_bwrap_linux_x86_64.result }}
-        RESULT_BUNDLE_MAC_AARCH64: ${{ needs.bundle_mac_aarch64.result }}
-        RESULT_BUNDLE_MAC_X86_64: ${{ needs.bundle_mac_x86_64.result }}
-        RESULT_BUNDLE_WINDOWS_AARCH64: ${{ needs.bundle_windows_aarch64.result }}
-        RESULT_BUNDLE_WINDOWS_X86_64: ${{ needs.bundle_windows_x86_64.result }}
-    - name: release::send_slack_message
-      if: steps.generate-webhook-message.outputs.message != ''
-      run: 'curl -X POST -H ''Content-type: application/json'' --data "$(jq -n --arg text "$SLACK_MESSAGE" ''{"text": $text}'')" "$SLACK_WEBHOOK"'
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_WORKFLOW_FAILURES }}
-        SLACK_MESSAGE: ${{ steps.generate-webhook-message.outputs.message }}
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
-  cancel-in-progress: true
-defaults:
-  run:
-    shell: bash -euxo pipefail {0}
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**/*

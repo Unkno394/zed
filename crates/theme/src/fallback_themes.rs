@@ -388,5 +388,11 @@ pub(crate) fn zed_default_dark() -> Theme {
                 ("diff.minus".into(), red.into()),
             ])),
         },
+        wallpaper: None,
+        wallpaper_scale: None,
+        wallpaper_offset_x: None,
+        wallpaper_offset_y: None,
+        wallpaper_anchor: None,
+        wallpaper_opacity: None,
     }
 }

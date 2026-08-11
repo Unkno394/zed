@@ -325,6 +325,7 @@ impl VsCodeSettings {
             completion_menu_item_kind: None,
             diff_view_style: None,
             minimum_split_diff_width: None,
+            wallpaper_animation: None,
         }
     }
 
@@ -1008,6 +1009,7 @@ impl VsCodeSettings {
             icon_theme: None,
             ui_density: None,
             unnecessary_code_fade: None,
+            window_opacity: None,
             experimental_theme_overrides: None,
             theme_overrides: Default::default(),
         }
