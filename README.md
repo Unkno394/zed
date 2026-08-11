@@ -128,7 +128,7 @@ https://github.com/user-attachments/assets/cb2b207e-5312-49c3-b47d-88fff4126fc4
 
 <!--
 GitHub does not render local repo video files inline. To embed the demo
-video, drag-and-drop `docs/.readme-media/<3.mp4` into a GitHub PR/issue
+video, drag-and-drop `docs/.readme-media/meow.mp4` into a GitHub PR/issue
 comment box (or the README edit box on github.com) and it will be uploaded
 to GitHub's asset CDN; then replace the placeholder link above with the
 `https://github.com/user-attachments/assets/...` URL GitHub gives back.
