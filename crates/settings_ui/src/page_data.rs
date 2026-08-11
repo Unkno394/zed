@@ -894,6 +894,7 @@ fn appearance_page() -> SettingsPage {
                 description: Some(
                     "Browse installed themes grouped by wallpaper, with previews.".into(),
                 ),
+                search_aliases: &[],
                 json_path: Some(crate::THEME_BROWSER_SETTINGS_PATH),
                 in_json: false,
                 files: USER,
