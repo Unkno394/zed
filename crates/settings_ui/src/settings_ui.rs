@@ -49,11 +49,7 @@ use workspace::{
 };
 use zed_actions::{
     AGENT_SKILLS_SETTINGS_PATH, OpenProjectSettings, OpenSettings, OpenSettingsAt,
-<<<<<<< HEAD
-    OpenSettingsAtTarget, OpenSettingsPage,
-=======
-    OpenSettingsAtTarget, OpenThemeBrowser,
->>>>>>> 94d4aba467 (Add wallpaper rendering, window transparency, and Doki theme collectionAdd wallpaper rendering, window transparency, and Doki theme collection)
+    OpenSettingsAtTarget, OpenSettingsPage, OpenThemeBrowser,
 };
 
 pub(crate) const THEME_BROWSER_SETTINGS_PATH: &str = "theme_browser";
