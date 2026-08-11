@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/448150aa-f469-4287-9e9a-299d860c634c
+
 # Zed Aura
 
 <!--
@@ -124,7 +128,7 @@ theme switch so idle memory use doesn't grow the longer a session runs.
 
 ### Video
 
-https://github.com/user-attachments/assets/REPLACE_ME_WITH_UPLOADED_VIDEO_ID
+https://github.com/user-attachments/assets/cb2b207e-5312-49c3-b47d-88fff4126fc4
 
 <!--
 GitHub does not render local repo video files inline. To embed the demo
