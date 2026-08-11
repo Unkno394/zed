@@ -5023,6 +5023,7 @@ impl EditorElement {
                             window.with_element_opacity(Some(opacity), |window| {
                                 window
                                     .paint_image(
+                                        editor_bounds,
                                         image_bounds,
                                         gpui::Corners::default(),
                                         image,
