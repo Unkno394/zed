@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/448150aa-f469-4287-9e9a-299d860c634c
-
 # Zed Aura
 
 <!--
