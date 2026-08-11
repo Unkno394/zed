@@ -80,16 +80,44 @@ export CXX=${CXX:-$(which clang++)}
 # (see https://github.com/rust-lang/cargo/issues/5376), the
 # [target.aarch64-unknown-linux-gnu] section in config.toml has no effect here.
 if [[ "$(uname -m)" == "aarch64" ]]; then
-    # webrtc-sys's vendored libyuv compiles ARM SME routines with clang, which
-    # reference compiler-rt builtins (e.g. __arm_tpidr2_save). The default "cc"
-    # linker driver is GCC on this runner and doesn't link compiler-rt, so the
-    # final binary link must also go through clang to pull those symbols in.
-    # rustc always passes -nodefaultlibs, which also suppresses clang's own
-    # automatic compiler-rt linking, so the builtins archive must be added
-    # explicitly by path.
-    compiler_rt_dir=$("${CC}" --print-runtime-dir)
-    compiler_rt_builtins="${compiler_rt_dir}/libclang_rt.builtins-aarch64.a"
-    export RUSTFLAGS="${RUSTFLAGS:-} -C linker=${CC} -C link-arg=-fuse-ld=lld -C link-arg=${compiler_rt_builtins} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
+    # webrtc-sys's vendored libyuv probes for ARM SME support by *compiling*
+    # (not linking) a snippet with -march=armv9-a+i8mm+sme; that probe alone
+    # isn't a reliable test, because clang on this runner (llvm-14, from the
+    # distro's plain "clang" package) accepts the flag/attribute but its
+    # compiler-rt predates the SME ABI runtime helpers (e.g.
+    # __arm_tpidr2_save) that the resulting code calls, so the final link
+    # fails with an undefined symbol no matter which linker is used. Make
+    # the probe fail on purpose by rejecting any -march containing "+sme",
+    # so libyuv falls back to its NEON path (LIBYUV_DISABLE_SME) instead -
+    # SME there is purely an optional perf optimization, not a requirement.
+    cc_no_sme_dir="$(mktemp -d)"
+    cc_no_sme="${cc_no_sme_dir}/cc-no-sme"
+    cat > "${cc_no_sme}" <<WRAPPER
+#!/usr/bin/env bash
+for arg in "\$@"; do
+    case "\$arg" in
+        *+sme*) exit 1 ;;
+    esac
+done
+exec "${CC}" "\$@"
+WRAPPER
+    chmod +x "${cc_no_sme}"
+    cxx_no_sme="${cc_no_sme_dir}/cxx-no-sme"
+    cat > "${cxx_no_sme}" <<WRAPPER
+#!/usr/bin/env bash
+for arg in "\$@"; do
+    case "\$arg" in
+        *+sme*) exit 1 ;;
+    esac
+done
+exec "${CXX}" "\$@"
+WRAPPER
+    chmod +x "${cxx_no_sme}"
+    export CC="${cc_no_sme}"
+    export CXX="${cxx_no_sme}"
+
+    # We still need lld (not GNU ld) to link libwebrtc.a successfully on aarch64-linux.
+    export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-fuse-ld=lld -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
