@@ -78,6 +78,13 @@ EOF
 chmod +x "${cxx17_wrapper}"
 export CXX="${cxx17_wrapper}"
 
+# The zed binary's __TEXT section is large enough (~200MB+, mostly the
+# statically linked webrtc-sys) to exceed the ARM64 direct-branch range of
+# 128MB. Xcode 15's default linker (ld-prime) fails to insert branch islands
+# correctly for binaries this large ("B/BL out of range"); the classic ld64
+# handles it correctly.
+export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-ld_classic"
+
 version_info=$(rustc --version --verbose)
 host_line=$(echo "$version_info" | grep host)
 target_triple=${host_line#*: }
