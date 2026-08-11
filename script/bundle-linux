@@ -117,7 +117,21 @@ WRAPPER
     export CXX="${cxx_no_sme}"
 
     # We still need lld (not GNU ld) to link libwebrtc.a successfully on aarch64-linux.
-    export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-fuse-ld=lld -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
+    linker_flags="-C link-arg=-fuse-ld=lld -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
+
+    # Even with the SME probe above rejected, the prebuilt libwebrtc.a's
+    # libyuv still ships an SME-optimized rotate path (rotate_sme.cc) on
+    # aarch64 linux, which calls SME ABI runtime helpers
+    # (__arm_tpidr2_save, __arm_tpidr2_restore) that only exist in libgcc
+    # starting with GCC 14. `cc` resolves to the distro's default gcc
+    # alternative, which on e.g. Ubuntu 22.04 (gcc-11) lacks them, causing
+    # "undefined symbol: __arm_tpidr2_save" at link time. Prefer gcc-14 as
+    # the link driver when script/linux has installed it; distros whose
+    # default gcc is already >= 14 don't need this.
+    if command -v gcc-14 >/dev/null 2>&1; then
+        linker_flags="${linker_flags} -C linker=gcc-14"
+    fi
+    export RUSTFLAGS="${RUSTFLAGS:-} ${linker_flags}"
 else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
