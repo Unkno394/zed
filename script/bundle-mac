@@ -64,6 +64,20 @@ fi
 # Deal with versions of macOS that don't include libstdc++ headers
 export CXXFLAGS="-stdlib=libc++"
 
+# webrtc-sys hardcodes -std=c++20, which trips a static_assert in cxx.h that
+# fails to compile under Xcode 15.4's libc++ (rust::Slice::iterator doesn't
+# satisfy std::contiguous_iterator there). The compiler uses whichever -std
+# flag is last on the command line, so appending -std=c++17 here overrides
+# the hardcoded c++20 and skips that assert.
+cxx17_wrapper_dir="$(mktemp -d)"
+cxx17_wrapper="${cxx17_wrapper_dir}/clang++-cxx17"
+cat > "${cxx17_wrapper}" <<'EOF'
+#!/usr/bin/env bash
+exec clang++ "$@" -std=c++17
+EOF
+chmod +x "${cxx17_wrapper}"
+export CXX="${cxx17_wrapper}"
+
 version_info=$(rustc --version --verbose)
 host_line=$(echo "$version_info" | grep host)
 target_triple=${host_line#*: }

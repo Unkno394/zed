@@ -67,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
-          path: target/release/zed-*-linux-*.tar.gz
+          path: target/release/zed-linux-*.tar.gz
           if-no-files-found: error
 
   linux-aarch64:
@@ -102,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-aarch64
-          path: target/release/zed-*-linux-*.tar.gz
+          path: target/release/zed-linux-*.tar.gz
           if-no-files-found: error
 
   macos:
