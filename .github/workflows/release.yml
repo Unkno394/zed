@@ -146,6 +146,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Enable git long paths
+        # Some cargo git dependencies (e.g. python-environment-tools' test
+        # fixtures) exceed Windows' 260-character MAX_PATH. core.longpaths
+        # only takes effect for git.exe, so also force cargo to fetch via
+        # the CLI instead of its bundled libgit2, which doesn't support it.
+        shell: pwsh
+        run: |
+          git config --system core.longpaths true
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $env:GITHUB_ENV
+
       - name: Install Rust toolchain
         shell: pwsh
         run: |
