@@ -124,8 +124,7 @@ theme switch so idle memory use doesn't grow the longer a session runs.
 
 ### Video
 
-https://github.com/user-attachments/assets/cb2b207e-5312-49c3-b47d-88fff4126fc4
-
+https://github.com/user-attachments/assets/27ab57ba-71e6-4be4-8abf-9aa0905ad465
 <!--
 GitHub does not render local repo video files inline. To embed the demo
 video, drag-and-drop `docs/.readme-media/meow.mp4` into a GitHub PR/issue
