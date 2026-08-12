@@ -122,14 +122,26 @@ WRAPPER
     # Even with the SME probe above rejected, the prebuilt libwebrtc.a's
     # libyuv still ships an SME-optimized rotate path (rotate_sme.cc) on
     # aarch64 linux, which calls SME ABI runtime helpers
-    # (__arm_tpidr2_save, __arm_tpidr2_restore) that only exist in libgcc
-    # starting with GCC 14. `cc` resolves to the distro's default gcc
-    # alternative, which on e.g. Ubuntu 22.04 (gcc-11) lacks them, causing
-    # "undefined symbol: __arm_tpidr2_save" at link time. Prefer gcc-14 as
-    # the link driver when script/linux has installed it; distros whose
-    # default gcc is already >= 14 don't need this.
+    # (__arm_tpidr2_save, __arm_tpidr2_restore). `cc` resolves to the
+    # distro's default gcc alternative, which on e.g. Ubuntu 22.04
+    # (gcc-11) lacks them, causing "undefined symbol: __arm_tpidr2_save"
+    # at link time. Prefer gcc-14 (libgcc has these symbols since GCC 14)
+    # as the link driver when script/linux has installed it; fall back to
+    # clang-18 + LLVM's compiler-rt (which has provided these symbols
+    # since clang 17) if gcc-14 isn't available - two independently
+    # sourced toolchains so one backport being missing/broken for a given
+    # distro/arch doesn't leave the build silently linking with `cc` and
+    # failing with a confusing error far from the actual cause.
     if command -v gcc-14 >/dev/null 2>&1; then
         linker_flags="${linker_flags} -C linker=gcc-14"
+    elif command -v clang-18 >/dev/null 2>&1; then
+        rt_dir="$(clang-18 --print-runtime-dir)"
+        linker_flags="${linker_flags} -C linker=clang-18 -C link-arg=--rtlib=compiler-rt -C link-arg=-L${rt_dir}"
+    else
+        echo "error: neither gcc-14 nor clang-18 found; the aarch64 link" >&2
+        echo "will almost certainly fail with 'undefined symbol:" >&2
+        echo "__arm_tpidr2_save' (see script/linux for why)." >&2
+        exit 1
     fi
     export RUSTFLAGS="${RUSTFLAGS:-} ${linker_flags}"
 else

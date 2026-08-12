@@ -89,14 +89,18 @@ if [[ -n $apt ]]; then
 
   # The prebuilt libwebrtc.a's libyuv includes an ARM SME-optimized rotate
   # path (rotate_sme.cc) on aarch64 linux, which calls into SME ABI runtime
-  # helpers (__arm_tpidr2_save, __arm_tpidr2_restore) that only exist in
-  # libgcc starting with GCC 14. The final `cc`-driven link of the zed
-  # binary resolves `cc` to whichever gcc is the default alternative and
-  # only searches that gcc's own libgcc directories, so on hosts with an
-  # older default gcc (e.g. Ubuntu 22.04 ships gcc-11) the link fails with
-  # "undefined symbol: __arm_tpidr2_save". Install gcc-14 alongside the
-  # default gcc (without changing the default) so script/bundle-linux can
-  # select it as the link driver.
+  # helpers (__arm_tpidr2_save, __arm_tpidr2_restore). These only exist in
+  # libgcc starting with GCC 14, and in LLVM's compiler-rt starting with
+  # clang-17+. The final `cc`-driven link of the zed binary resolves `cc`
+  # to whichever gcc is the default alternative and only searches that
+  # gcc's own libgcc directories, so on hosts with an older default gcc
+  # (e.g. Ubuntu 22.04 ships gcc-11) the link fails with "undefined
+  # symbol: __arm_tpidr2_save". Install both gcc-14 and clang-18 alongside
+  # the default toolchain (without changing the default) so
+  # script/bundle-linux has two independent options to select a link
+  # driver that actually provides these symbols - the gcc-14 backport for
+  # a given Launchpad PPA/arch combination isn't guaranteed to work, so a
+  # second, differently-sourced fallback avoids a single point of failure.
   if [[ "$(uname -m)" == "aarch64" ]]; then
     gcc_major=0
     if command -v gcc > /dev/null 2>&1; then
@@ -105,6 +109,10 @@ if [[ -n $apt ]]; then
     if [[ "$gcc_major" -lt 14 ]]; then
       add_ubuntu_toolchain_r_ppa
       deps+=( gcc-14 g++-14 )
+    fi
+    if ! command -v clang-18 > /dev/null 2>&1; then
+      add_ubuntu_toolchain_r_ppa
+      deps+=( clang-18 )
     fi
   fi
 
