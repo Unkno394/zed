@@ -23,3 +23,10 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [env]
 MACOSX_DEPLOYMENT_TARGET = "10.15.7"
+
+[net]
+# libgit2's bundled TLS doesn't trust the macOS keychain CA store, which has
+# caused intermittent "untrusted connection error; class=Ssl" failures
+# fetching git dependencies (e.g. wprcontrol) on macOS CI runners. Shelling
+# out to the system git CLI uses the OS trust store instead.
+git-fetch-with-cli = true
