@@ -80,10 +80,21 @@ export CXX="${cxx17_wrapper}"
 
 # The zed binary's __TEXT section is large enough (~200MB+, mostly the
 # statically linked webrtc-sys) to exceed the ARM64 direct-branch range of
-# 128MB. Xcode 15's default linker (ld-prime) fails to insert branch islands
-# correctly for binaries this large ("B/BL out of range"); the classic ld64
-# handles it correctly.
-export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-ld_classic"
+# 128MB. Older Xcode's default linker (ld-prime) failed to insert branch
+# islands correctly for binaries this large ("B/BL out of range"); the
+# classic ld64 handled it correctly. Newer Xcode versions have removed
+# ld_classic for Apple Silicon, in which case this flag is a silent no-op
+# and the build falls back to whichever linker is default - probe for it
+# instead of assuming it's there, so a missing/broken workaround shows up
+# as a clear message here rather than a confusing link failure later.
+if echo 'int main(void){return 0;}' | cc -x c - -o /dev/null -Wl,-ld_classic >/dev/null 2>&1; then
+    export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-ld_classic"
+else
+    echo "warning: -ld_classic is not supported by this toolchain; relying" >&2
+    echo "on the default linker plus per-crate codegen-units splitting" >&2
+    echo "(see gpui_macos override in Cargo.toml) to avoid the ARM64" >&2
+    echo "branch-out-of-range bug." >&2
+fi
 
 version_info=$(rustc --version --verbose)
 host_line=$(echo "$version_info" | grep host)

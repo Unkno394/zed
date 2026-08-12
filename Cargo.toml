@@ -1063,6 +1063,11 @@ codegen-units = 1
 
 [profile.release.package]
 zed = { codegen-units = 16 }
+# codegen-units = 1 (the workspace default) merges this crate's objc
+# class-registration code into one giant function; on aarch64-apple-darwin
+# that single function can end up more than 128MB away from its call site,
+# which trips ld64's "ARM64 branch out of range" bug.
+gpui_macos = { codegen-units = 16 }
 
 [profile.release-fast]
 inherits = "release"
