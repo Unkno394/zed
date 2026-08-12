@@ -105,36 +105,38 @@ jobs:
           path: target/release/zed-linux-*.tar.gz
           if-no-files-found: error
 
-  macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-14
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
-      - name: Build and package
-        run: ./script/bundle-mac ${{ matrix.target }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/*.dmg
-          if-no-files-found: error
+  # macos build temporarily disabled - see script/bundle-mac aarch64 link
+  # failures (ARM64 branch out of range / libstdc++ ABI mismatch).
+  # macos:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - target: aarch64-apple-darwin
+  #           runner: macos-14
+  #         - target: x86_64-apple-darwin
+  #           runner: macos-15-intel
+  #   runs-on: ${{ matrix.runner }}
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install Rust toolchain
+  #       run: rustup show
+  #
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         cache-on-failure: true
+  #
+  #     - name: Build and package
+  #       run: ./script/bundle-mac ${{ matrix.target }}
+  #
+  #     - name: Upload artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: macos-${{ matrix.target }}
+  #         path: target/${{ matrix.target }}/release/*.dmg
+  #         if-no-files-found: error
 
   windows:
     strategy:
@@ -185,7 +187,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [linux-x86_64, linux-aarch64, macos, windows]
+    needs: [linux-x86_64, linux-aarch64, windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
