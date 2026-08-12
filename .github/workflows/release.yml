@@ -147,11 +147,15 @@ jobs:
       # branch-island insertion for a binary this large depends on having a
       # recent LLVM. Refresh the formula index and upgrade any preinstalled
       # llvm so we're not stuck on whatever came baked into the runner image.
+      # Recent Homebrew llvm formulae split ld64.lld out into a separate
+      # "lld" formula, so install that too - script/bundle-mac already
+      # probes both prefixes for it.
       - name: Install lld fallback linker
         run: |
           brew update
           brew install llvm || brew upgrade llvm
-          "$(brew --prefix llvm)/bin/ld64.lld" --version
+          brew install lld || brew upgrade lld
+          "$(brew --prefix lld)/bin/ld64.lld" --version
 
       - name: Build and package
         run: ./script/bundle-mac aarch64-apple-darwin
