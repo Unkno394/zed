@@ -141,6 +141,13 @@ jobs:
         with:
           cache-on-failure: true
 
+      # ld_classic (needed to avoid ld64's "ARM64 branch out of range" bug on
+      # this large a binary, see script/bundle-mac) has been removed from
+      # recent Xcode versions on Apple Silicon runners. Install LLVM's lld as
+      # a fallback linker so the script still has a working workaround.
+      - name: Install lld fallback linker
+        run: brew install llvm
+
       - name: Build and package
         run: ./script/bundle-mac aarch64-apple-darwin
 

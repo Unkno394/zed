@@ -87,13 +87,28 @@ export CXX="${cxx17_wrapper}"
 # and the build falls back to whichever linker is default - probe for it
 # instead of assuming it's there, so a missing/broken workaround shows up
 # as a clear message here rather than a confusing link failure later.
+lld_candidate=""
+for candidate in "$(brew --prefix llvm 2>/dev/null || true)/bin/ld64.lld" "$(brew --prefix lld 2>/dev/null || true)/bin/ld64.lld"; do
+    if [[ -n "$candidate" && -x "$candidate" ]]; then
+        lld_candidate="$candidate"
+        break
+    fi
+done
+
 if echo 'int main(void){return 0;}' | cc -x c - -o /dev/null -Wl,-ld_classic >/dev/null 2>&1; then
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-ld_classic"
+elif [[ -n "$lld_candidate" ]] && echo 'int main(void){return 0;}' | cc -x c - -o /dev/null -fuse-ld="$lld_candidate" >/dev/null 2>&1; then
+    # ld_classic was removed for Apple Silicon in newer Xcode versions and the
+    # default replacement (ld-prime) fails to insert branch islands correctly
+    # for binaries this large ("B/BL out of range"). LLVM's Mach-O lld doesn't
+    # have that bug, so prefer it over the broken default when ld_classic is
+    # unavailable.
+    export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-fuse-ld=${lld_candidate}"
 else
-    echo "warning: -ld_classic is not supported by this toolchain; relying" >&2
-    echo "on the default linker plus per-crate codegen-units splitting" >&2
-    echo "(see gpui_macos override in Cargo.toml) to avoid the ARM64" >&2
-    echo "branch-out-of-range bug." >&2
+    echo "warning: neither -ld_classic nor lld are available on this" >&2
+    echo "toolchain; relying on the default linker plus per-crate" >&2
+    echo "codegen-units splitting (see gpui_macos/zed overrides in" >&2
+    echo "Cargo.toml) to avoid the ARM64 branch-out-of-range bug." >&2
 fi
 
 version_info=$(rustc --version --verbose)

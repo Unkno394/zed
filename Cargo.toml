@@ -1062,7 +1062,11 @@ lto = "thin"
 codegen-units = 1
 
 [profile.release.package]
-zed = { codegen-units = 16 }
+# Higher codegen-units keeps this crate's object files smaller, which helps
+# keep individual function/call-site distances under aarch64-apple-darwin's
+# +/-128MB `bl` range (see the gpui_macos comment below and script/bundle-mac,
+# which also try to force the classic ld64 linker for the same reason).
+zed = { codegen-units = 32 }
 # codegen-units = 1 (the workspace default) merges this crate's objc
 # class-registration code into one giant function; on aarch64-apple-darwin
 # that single function can end up more than 128MB away from its call site,
