@@ -80,61 +80,36 @@ export CXX=${CXX:-$(which clang++)}
 # (see https://github.com/rust-lang/cargo/issues/5376), the
 # [target.aarch64-unknown-linux-gnu] section in config.toml has no effect here.
 if [[ "$(uname -m)" == "aarch64" ]]; then
-    # webrtc-sys's vendored libyuv probes for ARM SME support by *compiling*
-    # (not linking) a snippet with -march=armv9-a+i8mm+sme; that probe alone
-    # isn't a reliable test, because clang on this runner (llvm-14, from the
-    # distro's plain "clang" package) accepts the flag/attribute but its
-    # compiler-rt predates the SME ABI runtime helpers (e.g.
-    # __arm_tpidr2_save) that the resulting code calls, so the final link
-    # fails with an undefined symbol no matter which linker is used. Make
-    # the probe fail on purpose by rejecting any -march containing "+sme",
-    # so libyuv falls back to its NEON path (LIBYUV_DISABLE_SME) instead -
-    # SME there is purely an optional perf optimization, not a requirement.
-    cc_no_sme_dir="$(mktemp -d)"
-    cc_no_sme="${cc_no_sme_dir}/cc-no-sme"
-    cat > "${cc_no_sme}" <<WRAPPER
-#!/usr/bin/env bash
-for arg in "\$@"; do
-    case "\$arg" in
-        *+sme*) exit 1 ;;
-    esac
-done
-exec "${CC}" "\$@"
-WRAPPER
-    chmod +x "${cc_no_sme}"
-    cxx_no_sme="${cc_no_sme_dir}/cxx-no-sme"
-    cat > "${cxx_no_sme}" <<WRAPPER
-#!/usr/bin/env bash
-for arg in "\$@"; do
-    case "\$arg" in
-        *+sme*) exit 1 ;;
-    esac
-done
-exec "${CXX}" "\$@"
-WRAPPER
-    chmod +x "${cxx_no_sme}"
-    export CC="${cc_no_sme}"
-    export CXX="${cxx_no_sme}"
-
     # We still need lld (not GNU ld) to link libwebrtc.a successfully on aarch64-linux.
     linker_flags="-C link-arg=-fuse-ld=lld -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 
-    # Even with the SME probe above rejected, the prebuilt libwebrtc.a's
-    # libyuv still ships an SME-optimized rotate path (rotate_sme.cc) on
-    # aarch64 linux, which calls SME ABI runtime helpers
+    # The prebuilt libwebrtc.a's libyuv ships an SME-optimized rotate path
+    # (rotate_sme.cc) on aarch64 linux, which calls SME ABI runtime helpers
     # (__arm_tpidr2_save, __arm_tpidr2_restore). `cc` resolves to the
     # distro's default gcc alternative, which on e.g. Ubuntu 22.04
     # (gcc-11) lacks them, causing "undefined symbol: __arm_tpidr2_save"
     # at link time. Prefer gcc-14 (libgcc has these symbols since GCC 14)
-    # as the link driver when script/linux has installed it; fall back to
-    # clang-18 + LLVM's compiler-rt (which has provided these symbols
-    # since clang 17) if gcc-14 isn't available - two independently
-    # sourced toolchains so one backport being missing/broken for a given
-    # distro/arch doesn't leave the build silently linking with `cc` and
-    # failing with a confusing error far from the actual cause.
+    # when script/linux has installed it, and also compile webrtc-sys's
+    # own C++ wrapper files with g++-14 (not the default clang) - mixing
+    # clang for compiling with gcc-14 for linking trips a libstdc++ ABI
+    # mismatch (clang auto-detects gcc-14's newer libstdc++ headers, which
+    # declare std::to_string's __resize_and_overwrite helper as requiring
+    # an external definition that clang - unlike gcc itself - doesn't
+    # inline, leaving it undefined at link time). Compiling and linking
+    # with the same gcc-14 avoids that mismatch entirely.
     if command -v gcc-14 >/dev/null 2>&1; then
+        export CC="gcc-14"
+        export CXX="g++-14"
         linker_flags="${linker_flags} -C linker=gcc-14"
     elif command -v clang-18 >/dev/null 2>&1; then
+        # Fallback toolchain: clang-18 + LLVM's compiler-rt (which has
+        # provided the SME ABI helpers since clang 17) for both compiling
+        # and linking, kept independent of the gcc-14 backport so one
+        # broken/missing toolchain doesn't leave the build silently
+        # linking with `cc` and failing with a confusing error far from
+        # the actual cause.
+        export CC="clang-18"
+        export CXX="clang++-18"
         rt_dir="$(clang-18 --print-runtime-dir)"
         linker_flags="${linker_flags} -C linker=clang-18 -C link-arg=--rtlib=compiler-rt -C link-arg=-L${rt_dir}"
     else
