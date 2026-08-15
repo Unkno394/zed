@@ -4920,7 +4920,7 @@ impl EditorElement {
             return;
         }
         if let Some(old_path) = previous_path {
-            let old_resource = gpui::Resource::from(std::path::PathBuf::from(old_path.as_ref()));
+            let old_resource = gpui::Resource::Embedded(old_path);
             cx.remove_asset::<gpui::ImgResourceLoader>(&old_resource);
         }
         cx.set_global(WallpaperAssetTracker {
@@ -4942,7 +4942,7 @@ impl EditorElement {
                 let wallpaper_path = cx.theme().wallpaper.clone();
                 Self::evict_stale_wallpaper_asset(wallpaper_path.as_ref(), cx);
                 if let Some(wallpaper_path) = wallpaper_path {
-                    let resource = gpui::Resource::from(std::path::PathBuf::from(wallpaper_path.as_ref()));
+                    let resource = gpui::Resource::Embedded(wallpaper_path.clone());
                     if let Some(Ok(image)) =
                         window.use_asset::<gpui::ImgResourceLoader>(&resource, cx)
                     {
