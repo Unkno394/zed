@@ -1,15 +1,8 @@
 # Zed Aura
 
-<!--
-Badge targets below assume this fork lives at github.com/your-username/zed-aura.
-Once pushed to your own GitHub repo, replace `your-username/zed-aura` in the
-CI/release/commit/stars badge URLs (and their link targets) with the real
-owner/repo path.
--->
-
 [![Zed](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/zed-industries/zed/main/assets/badge/v0.json&style=flat-square)](https://zed.dev)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](./LICENSE-GPL)
-[![Latest release](https://img.shields.io/github/v/release/your-username/zed-aura?style=flat-square)](https://github.com/your-username/zed-aura/releases)
+[![Latest release](https://img.shields.io/github/v/release/Unkno394/zed?style=flat-square)](https://github.com/Unkno394/zed/releases)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-blue?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Themes](https://img.shields.io/badge/themes-113-blue?style=flat-square)](#-themes)
 
@@ -270,8 +263,11 @@ selector, or **Themes → Browse Themes** for the visual browser.
 
 ## ▪ Installation
 
-This is a source fork and is not published as a standalone distribution.
-Build it from source following the instructions below.
+Prebuilt binaries for Linux, macOS, and Windows are published on the
+[Releases](https://github.com/Unkno394/zed/releases) page. Download
+the archive matching your platform and architecture and extract it.
+
+Alternatively, build it from source following the instructions below.
 
 <a id="developing"></a>
 

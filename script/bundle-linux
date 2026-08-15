@@ -192,12 +192,20 @@ cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"
 cp "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"
 
 # Libs
-# Bundle libstdc++ so older supported systems can run binaries built with our
-# toolchain even when their system libstdc++.so.6 lacks required GLIBCXX symbols.
+# Do NOT bundle libstdc++.so.6: the binary is linked with
+# -Wl,--disable-new-dtags,-rpath,$ORIGIN/../lib, which emits an old-style
+# DT_RPATH. Unlike DT_RUNPATH, DT_RPATH applies process-wide to every later
+# dlopen() call, not just the executable's own direct dependencies. That
+# means system drivers the process dlopen()s at runtime - e.g. Mesa's Vulkan
+# ICDs - resolve their own libstdc++.so.6 dependency against our bundled
+# (older, e.g. Ubuntu 22.04) copy instead of the host's. On systems with a
+# newer libstdc++ than the one we bundle, that GLIBCXX symbol mismatch makes
+# the driver silently fail to load, so wgpu sees zero adapters and Zed fails
+# to open a window with "Failed to create surface for any enabled backend".
 find_libs() {
     ldd ${target_dir}/${target_triple}/release/zed |\
         cut -d' ' -f3 |\
-        grep -v '\<\(libc.so\|libgcc_s.so\|libm.so\|libpthread.so\|libdl.so\|libasound.so\)'
+        grep -v '\<\(libstdc++.so\|libc.so\|libgcc_s.so\|libm.so\|libpthread.so\|libdl.so\|libasound.so\)'
 }
 
 mkdir -p "${zed_dir}/lib"
