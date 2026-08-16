@@ -1881,6 +1881,9 @@ fn load_user_themes_in_background(fs: Arc<dyn fs::Fs>, cx: &mut App) {
                 let Some(theme_path) = theme_path.log_err() else {
                     continue;
                 };
+                if theme_path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                    continue;
+                }
                 let Some(bytes) = fs.load_bytes(&theme_path).await.log_err() else {
                     continue;
                 };
@@ -1905,12 +1908,13 @@ fn watch_themes(fs: Arc<dyn fs::Fs>, cx: &mut App) {
 
         while let Some(paths) = events.next().await {
             for event in paths {
-                if fs
-                    .metadata(&event.path)
-                    .await
-                    .ok()
-                    .flatten()
-                    .is_some_and(|m| !m.is_dir)
+                if event.path.extension().and_then(|ext| ext.to_str()) == Some("json")
+                    && fs
+                        .metadata(&event.path)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some_and(|m| !m.is_dir)
                 {
                     let theme_registry = cx.update(|cx| ThemeRegistry::global(cx));
                     if let Some(bytes) = fs.load_bytes(&event.path).await.log_err()

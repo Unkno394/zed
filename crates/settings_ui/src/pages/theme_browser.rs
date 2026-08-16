@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs::Fs;
@@ -203,11 +202,7 @@ fn render_theme_tile(theme: Arc<Theme>, active_theme_name: &SharedString) -> Any
                 })
                 .bg(swatch_color)
                 .when_some(wallpaper, |this, wallpaper| {
-                    this.child(
-                        img(PathBuf::from(wallpaper.to_string()))
-                            .size_full()
-                            .object_fit(ObjectFit::Cover),
-                    )
+                    this.child(img(wallpaper).size_full().object_fit(ObjectFit::Cover))
                 }),
         )
         .child(
