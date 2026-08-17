@@ -263,9 +263,65 @@ selector, or **Themes → Browse Themes** for the visual browser.
 
 ## ▪ Installation
 
-Prebuilt binaries for Linux, macOS, and Windows are published on the
-[Releases](https://github.com/Unkno394/zed/releases) page. Download
-the archive matching your platform and architecture and extract it.
+Every [release](https://github.com/Unkno394/zed/releases) publishes **two
+files per operating system** — one per CPU architecture, not two options for
+the same machine. Pick the one matching your CPU, not your OS alone:
+
+| File | OS | CPU |
+|---|---|---|
+| `zed-linux-x86_64.tar.gz` | Linux | Intel / AMD (most PCs) |
+| `zed-linux-aarch64.tar.gz` | Linux | ARM64 (Raspberry Pi, ARM laptops) |
+| `Zed-x86_64.dmg` | macOS | Intel Mac |
+| `Zed-aarch64.dmg` | macOS | Apple Silicon (M1/M2/M3/M4) |
+| `Zed-x86_64.exe` | Windows | Intel / AMD (most PCs) |
+| `Zed-aarch64.exe` | Windows | ARM64 (e.g. Surface Pro X, ARM Copilot+ PCs) |
+
+If you don't know your CPU architecture:
+
+- **Linux/macOS**: run `uname -m` in a terminal. `x86_64` → the `x86_64`
+  file; `arm64`/`aarch64` → the `aarch64` file.
+- **Windows**: Settings → System → About → "System type". "x64-based
+  processor" → the `x86_64` file; "ARM-based processor" → the `aarch64` file.
+  If unsure, `x86_64` is correct for the vast majority of Windows PCs.
+
+### Linux
+
+Easiest: run the install script, which detects your architecture, downloads
+the matching archive, and installs it to `~/.local/`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Unkno394/zed/main/script/install-aura-linux.sh | sh
+```
+
+This installs a `zed-aura` binary and a desktop entry. Afterwards, launch it
+with `zed-aura` (add `~/.local/bin` to your `PATH` first if the script tells
+you to).
+
+To install a specific version instead of the latest, set
+`ZED_AURA_VERSION`, e.g.:
+
+```sh
+ZED_AURA_VERSION=v0.2.0-aura sh script/install-aura-linux.sh
+```
+
+Or download the `.tar.gz` matching your architecture from the table above
+and extract it manually.
+
+### macOS
+
+Download the `.dmg` matching your architecture from the table above, open
+it, and drag Zed Aura into `Applications`. Since the build is only ad-hoc
+signed (no Apple Developer certificate), Gatekeeper will flag it as from an
+"unidentified developer" on first launch — right-click (or control-click)
+the app and choose **Open** once to bypass it.
+
+### Windows
+
+Download the `.exe` matching your architecture from the table above and run
+it. The build is unsigned, so Windows SmartScreen will show an "unrecognized
+app" warning on first launch — click **More info** → **Run anyway**.
+
+### Building from source
 
 Alternatively, build it from source following the instructions below.
 
