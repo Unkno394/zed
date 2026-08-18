@@ -71,6 +71,36 @@ pub struct EditorSettings {
     pub minimum_split_diff_width: f32,
     pub file_diff: FileDiffSettings,
     pub wallpaper_animation: Option<String>,
+    pub wallpaper: WallpaperSettings,
+}
+
+/// Wallpaper image related settings.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct WallpaperSettings {
+    /// Master switch for the wallpaper feature.
+    ///
+    /// Default: false
+    pub enabled: bool,
+    /// When true, always draws the same wallpaper regardless of the active
+    /// theme: `pinned_theme`'s built-in wallpaper if set, else `path` as a
+    /// fallback. When false, each theme shows its own built-in wallpaper.
+    pub pinned: bool,
+    /// Name of the theme whose built-in wallpaper to keep showing while
+    /// `pinned` is true, regardless of which theme is actually active.
+    pub pinned_theme: Option<String>,
+    /// Path to a custom wallpaper image on disk, used while `pinned` is true
+    /// and `pinned_theme` is unset or not found.
+    pub path: Option<String>,
+    /// Opacity (0.0-1.0) at which the wallpaper is painted. Defaults to 0.25 when unset.
+    pub opacity: Option<f32>,
+    /// Scale factor (0.0-1.0) for the wallpaper relative to the editor size.
+    pub scale: Option<f32>,
+    /// Horizontal offset in pixels applied to the wallpaper's rendered position.
+    pub offset_x: Option<f32>,
+    /// Vertical offset in pixels applied to the wallpaper's rendered position.
+    pub offset_y: Option<f32>,
+    /// Corner of the editor the wallpaper is anchored to when `scale` is set.
+    pub anchor: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -330,6 +360,17 @@ impl Settings for EditorSettings {
                 show_full_file: file_diff.show_full_file.unwrap(),
             },
             wallpaper_animation: editor.wallpaper_animation,
+            wallpaper: WallpaperSettings {
+                enabled: editor.wallpaper_enabled.unwrap_or(false),
+                pinned: editor.wallpaper_pinned.unwrap_or(false),
+                pinned_theme: editor.wallpaper_pinned_theme,
+                path: editor.wallpaper,
+                opacity: editor.wallpaper_opacity,
+                scale: editor.wallpaper_scale,
+                offset_x: editor.wallpaper_offset_x,
+                offset_y: editor.wallpaper_offset_y,
+                anchor: editor.wallpaper_anchor,
+            },
         }
     }
 }

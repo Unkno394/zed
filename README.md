@@ -148,6 +148,32 @@ Engine files touched: `crates/theme/src/theme.rs`,
 `crates/editor/src/editor.rs`, `crates/editor/src/element.rs` (the wallpaper
 is drawn during the paint phase, not prepaint — GPUI panics otherwise).
 
+#### User settings
+
+Whether a wallpaper is drawn at all — and which one — is controlled by user
+settings (`settings.json`), independent of the theme fields above. These are
+also exposed as toggles in Settings UI, both on the general **Appearance →
+Wallpaper** page and directly on **Browse Themes**.
+
+| Setting | Description |
+|---|---|
+| `wallpaper_enabled` | Master switch. When `false`, no wallpaper is ever drawn, regardless of the settings below or the active theme. Default `false`. |
+| `wallpaper_pinned` | When `true`, always draws the same wallpaper no matter which theme is active: `wallpaper_pinned_theme`'s built-in image if set, else the custom `wallpaper` path as a fallback. When `false` (default), each theme shows its own built-in wallpaper — a different image per theme. |
+| `wallpaper_pinned_theme` | Name of the theme whose built-in wallpaper to keep showing while `wallpaper_pinned` is `true`, regardless of which theme is actually active. Set automatically when pinning from the Browse Themes toggle (it captures whichever theme is active at that moment); can also be set by hand in `settings.json`. |
+| `wallpaper` | Path to a custom wallpaper image on disk, used while `wallpaper_pinned` is `true` and `wallpaper_pinned_theme` is unset or not found. |
+| `wallpaper_opacity`, `wallpaper_scale`, `wallpaper_offset_x`, `wallpaper_offset_y`, `wallpaper_anchor` | Same meaning as the theme fields above, applied to the custom `wallpaper` path. |
+
+On **Browse Themes**, the "Pin One Wallpaper Across Themes" toggle writes
+`wallpaper_pinned_theme` for you: flip it on while a given theme is active and
+that theme's wallpaper keeps showing as you click through other themes below
+(their colors apply, the wallpaper doesn't change). Flip it off to go back to
+each theme showing its own wallpaper.
+Code: `crates/settings_content/src/editor.rs` (`EditorSettingsContent`
+fields), `crates/editor/src/editor_settings.rs` (`WallpaperSettings`),
+`crates/editor/src/element.rs` (`paint_background` resolves master
+switch → pinned theme lookup via `ThemeRegistry` → custom path → per-theme
+fallback, in that order).
+
 GPUI splits a frame into two passes: prepaint computes layout only, and paint
 is where assets are actually resolved and rasterized. `window.use_asset` does
 more than fetch a decoded image — it also registers the redraw callback that
@@ -208,7 +234,10 @@ bar — toward transparent, and switches the window's background appearance to
 
 A **Themes → Browse Themes** menu entry (action `OpenThemeBrowser`) and a
 Settings UI page that group themes by wallpaper with visual previews,
-instead of scrolling a flat list of a hundred theme names.
+instead of scrolling a flat list of a hundred theme names. It also carries
+the **Enable Wallpaper** and **Pin One Wallpaper Across Themes** toggles (see
+[User settings](#user-settings) above) so wallpaper on/off and pinning can be
+controlled right next to the theme grid.
 Code: `crates/settings_ui/src/pages/theme_browser.rs`,
 `crates/settings_ui/src/page_data.rs`, `pages.rs`, `settings_ui.rs`.
 

@@ -287,6 +287,54 @@ pub struct EditorSettingsContent {
     /// Default: null
     #[serde(alias = "particles")]
     pub wallpaper_animation: Option<String>,
+    /// Master switch for the wallpaper feature. When false, no wallpaper is
+    /// ever drawn, regardless of `wallpaper_pinned` or the active theme.
+    ///
+    /// Default: false
+    pub wallpaper_enabled: Option<bool>,
+    /// When true, always draws the same wallpaper image no matter which theme
+    /// is active: either the built-in wallpaper of `wallpaper_pinned_theme`
+    /// (if set), or the custom image at `wallpaper` (if set) as a fallback.
+    /// When false, both are ignored and each theme shows its own built-in
+    /// wallpaper (if any) — the "different wallpaper per theme" behavior.
+    ///
+    /// Default: false
+    pub wallpaper_pinned: Option<bool>,
+    /// Name of the theme whose built-in wallpaper to keep showing while
+    /// `wallpaper_pinned` is true, regardless of the theme actually active.
+    /// Set automatically when pinning from the theme browser. Ignored unless
+    /// `wallpaper_pinned` is true.
+    ///
+    /// Default: null
+    pub wallpaper_pinned_theme: Option<String>,
+    /// Path to a custom wallpaper image on disk, used while `wallpaper_pinned`
+    /// is true and `wallpaper_pinned_theme` is unset or not found. Ignored otherwise.
+    ///
+    /// Default: null
+    pub wallpaper: Option<String>,
+    /// Opacity (0.0–1.0) at which the wallpaper is painted.
+    ///
+    /// Default: 0.25
+    pub wallpaper_opacity: Option<f32>,
+    /// Scale factor (0.0–1.0) for the wallpaper relative to the editor size.
+    /// When unset, the wallpaper covers the entire editor.
+    ///
+    /// Default: null
+    pub wallpaper_scale: Option<f32>,
+    /// Horizontal offset in pixels applied to the wallpaper's rendered position.
+    ///
+    /// Default: 0
+    pub wallpaper_offset_x: Option<f32>,
+    /// Vertical offset in pixels applied to the wallpaper's rendered position.
+    ///
+    /// Default: 0
+    pub wallpaper_offset_y: Option<f32>,
+    /// Corner of the editor the wallpaper is anchored to when `wallpaper_scale` is set.
+    ///
+    /// Supported values: "top-right", "bottom-right"
+    ///
+    /// Default: "bottom-right"
+    pub wallpaper_anchor: Option<String>,
 }
 
 #[derive(

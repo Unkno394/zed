@@ -326,6 +326,15 @@ impl VsCodeSettings {
             diff_view_style: None,
             minimum_split_diff_width: None,
             wallpaper_animation: None,
+            wallpaper_enabled: None,
+            wallpaper_pinned: None,
+            wallpaper_pinned_theme: None,
+            wallpaper: None,
+            wallpaper_opacity: None,
+            wallpaper_scale: None,
+            wallpaper_offset_x: None,
+            wallpaper_offset_y: None,
+            wallpaper_anchor: None,
         }
     }
 

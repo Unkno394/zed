@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use editor::EditorSettings;
 use fs::Fs;
 use gpui::{
     Global, ObjectFit, ReadGlobal, ScrollHandle, SharedString, UpdateGlobal, img, prelude::*,
@@ -7,7 +8,7 @@ use gpui::{
 use settings::{Settings, SettingsStore, WindowOpacity, update_settings_file};
 use theme::{ActiveTheme, SystemAppearance, Theme, ThemeRegistry};
 use theme_settings::{ThemeName, ThemeSelection, ThemeSettings};
-use ui::{h_flex, prelude::*, v_flex};
+use ui::{SwitchField, ToggleState, h_flex, prelude::*, v_flex};
 
 use crate::NumberFieldType;
 use crate::SettingsWindow;
@@ -76,6 +77,9 @@ pub(crate) fn render_theme_browser_page(
 
     let current_opacity =
         WindowOpacity(ThemeSettings::get_global(cx).window_opacity.unwrap_or(1.0));
+    let wallpaper_settings = &EditorSettings::get_global(cx).wallpaper;
+    let wallpaper_enabled = wallpaper_settings.enabled;
+    let wallpaper_pinned = wallpaper_settings.pinned;
 
     v_flex()
         .id("theme-browser-page")
@@ -89,6 +93,11 @@ pub(crate) fn render_theme_browser_page(
         .track_scroll(scroll_handle)
         .on_mouse_up_out(gpui::MouseButton::Left, |_, _, cx| end_preview(cx))
         .child(render_opacity_control(current_opacity, window, cx))
+        .child(render_wallpaper_toggles(
+            wallpaper_enabled,
+            wallpaper_pinned,
+            active_theme_name.clone(),
+        ))
         .child(
             Label::new("Hover a theme to preview it, click to keep it.")
                 .size(LabelSize::Small)
@@ -143,6 +152,57 @@ fn render_opacity_control(
                     settings_content.theme.window_opacity = Some(value);
                 });
             }),
+        )
+        .into_any_element()
+}
+
+fn render_wallpaper_toggles(
+    wallpaper_enabled: bool,
+    wallpaper_pinned: bool,
+    active_theme_name: SharedString,
+) -> AnyElement {
+    v_flex()
+        .gap_2()
+        .child(
+            SwitchField::new(
+                "theme-browser-wallpaper-enabled",
+                Some("Enable Wallpaper"),
+                Some("Master switch. Off hides any wallpaper, on any theme.".into()),
+                wallpaper_enabled,
+                move |state, _window, cx| {
+                    let enabled = *state == ToggleState::Selected;
+                    update_settings_file(<dyn Fs>::global(cx), cx, move |settings_content, _| {
+                        settings_content.editor.wallpaper_enabled = Some(enabled);
+                    });
+                },
+            )
+            .tab_index(0),
+        )
+        .child(
+            SwitchField::new(
+                "theme-browser-wallpaper-pinned",
+                Some("Pin One Wallpaper Across Themes"),
+                Some(
+                    "On: locks in the wallpaper of whichever theme is active right now, so that \
+                     image keeps showing even as you switch to other themes below. Off (default): \
+                     each theme shows its own built-in wallpaper — a different image per theme, \
+                     as before."
+                        .into(),
+                ),
+                wallpaper_pinned,
+                move |state, _window, cx| {
+                    let pinned = *state == ToggleState::Selected;
+                    let active_theme_name = active_theme_name.clone();
+                    update_settings_file(<dyn Fs>::global(cx), cx, move |settings_content, _| {
+                        settings_content.editor.wallpaper_pinned = Some(pinned);
+                        if pinned {
+                            settings_content.editor.wallpaper_pinned_theme =
+                                Some(active_theme_name.to_string());
+                        }
+                    });
+                },
+            )
+            .tab_index(1),
         )
         .into_any_element()
 }

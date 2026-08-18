@@ -85,7 +85,7 @@ use std::{
 };
 use sum_tree::Bias;
 use text::BufferId;
-use theme::{ActiveTheme, Appearance, PlayerColor};
+use theme::{ActiveTheme, Appearance, PlayerColor, Theme, ThemeRegistry};
 use theme_settings::BufferLineHeight;
 use ui::utils::ensure_minimum_contrast;
 use ui::{ButtonLike, POPOVER_Y_PADDING, Tooltip, prelude::*, scrollbars::ShowScrollbar};
@@ -247,11 +247,12 @@ pub struct EditorElement {
     split_side: Option<SplitSide>,
 }
 
-/// Global tracking the path of the currently decoded wallpaper asset, so that theme changes can
-/// evict the previous one from the asset cache instead of accumulating decoded images forever.
+/// Global tracking the resource of the currently decoded wallpaper asset, so that settings or
+/// theme changes can evict the previous one from the asset cache instead of accumulating decoded
+/// images forever.
 #[derive(Default)]
 struct WallpaperAssetTracker {
-    current_path: Option<SharedString>,
+    current_resource: Option<gpui::Resource>,
 }
 
 impl Global for WallpaperAssetTracker {}
@@ -4906,25 +4907,24 @@ impl EditorElement {
     }
 
     /// Tracks which wallpaper image is currently decoded in the asset cache so that switching
-    /// themes evicts the previous one instead of leaving every wallpaper ever viewed decoded in
-    /// memory (large animated GIFs can otherwise pin hundreds of MB per theme indefinitely).
+    /// settings or themes evicts the previous one instead of leaving every wallpaper ever viewed
+    /// decoded in memory (large animated GIFs can otherwise pin hundreds of MB indefinitely).
     ///
-    /// Takes the *current* theme's wallpaper (which may be `None`) so that switching to a theme
+    /// Takes the *current* wallpaper resource (which may be `None`) so that switching to a state
     /// with no wallpaper at all still evicts whatever was previously decoded, instead of only
-    /// evicting when the new theme also happens to set one.
-    fn evict_stale_wallpaper_asset(wallpaper_path: Option<&SharedString>, cx: &mut App) {
-        let previous_path = cx
+    /// evicting when the new state also happens to set one.
+    fn evict_stale_wallpaper_asset(wallpaper_resource: Option<&gpui::Resource>, cx: &mut App) {
+        let previous_resource = cx
             .try_global::<WallpaperAssetTracker>()
-            .and_then(|tracker| tracker.current_path.clone());
-        if previous_path.as_ref() == wallpaper_path {
+            .and_then(|tracker| tracker.current_resource.clone());
+        if previous_resource.as_ref() == wallpaper_resource {
             return;
         }
-        if let Some(old_path) = previous_path {
-            let old_resource = gpui::Resource::Embedded(old_path);
+        if let Some(old_resource) = previous_resource {
             cx.remove_asset::<gpui::ImgResourceLoader>(&old_resource);
         }
         cx.set_global(WallpaperAssetTracker {
-            current_path: wallpaper_path.cloned(),
+            current_resource: wallpaper_resource.cloned(),
         });
     }
 
@@ -4939,16 +4939,65 @@ impl EditorElement {
             ));
 
             if matches!(layout.mode, EditorMode::Full { .. }) {
-                let wallpaper_path = cx.theme().wallpaper.clone();
-                Self::evict_stale_wallpaper_asset(wallpaper_path.as_ref(), cx);
-                if let Some(wallpaper_path) = wallpaper_path {
-                    let resource = gpui::Resource::Embedded(wallpaper_path.clone());
+                let wallpaper_settings = EditorSettings::get_global(cx).wallpaper.clone();
+                let pinned_theme: Option<std::sync::Arc<Theme>> = wallpaper_settings
+                    .pinned
+                    .then(|| wallpaper_settings.pinned_theme.as_deref())
+                    .flatten()
+                    .and_then(|name| ThemeRegistry::global(cx).get(name).ok());
+                let wallpaper = if wallpaper_settings.enabled {
+                    if wallpaper_settings.pinned {
+                        if let Some(pinned_theme) = pinned_theme.as_ref() {
+                            pinned_theme.wallpaper.clone().map(|theme_wallpaper| {
+                                (
+                                    gpui::Resource::Embedded(theme_wallpaper),
+                                    pinned_theme.wallpaper_scale,
+                                    pinned_theme.wallpaper_offset_x.unwrap_or(0.0),
+                                    pinned_theme.wallpaper_offset_y.unwrap_or(0.0),
+                                    pinned_theme.wallpaper_anchor.as_ref().map(|s| s.to_string()),
+                                    pinned_theme.wallpaper_opacity.unwrap_or(0.25),
+                                )
+                            })
+                        } else {
+                            wallpaper_settings.path.as_ref().map(|path| {
+                                (
+                                    gpui::Resource::Path(
+                                        std::path::Path::new(path.as_str()).into(),
+                                    ),
+                                    wallpaper_settings.scale,
+                                    wallpaper_settings.offset_x.unwrap_or(0.0),
+                                    wallpaper_settings.offset_y.unwrap_or(0.0),
+                                    wallpaper_settings.anchor.clone(),
+                                    wallpaper_settings.opacity.unwrap_or(0.25),
+                                )
+                            })
+                        }
+                    } else {
+                        cx.theme().wallpaper.clone().map(|theme_wallpaper| {
+                            (
+                                gpui::Resource::Embedded(theme_wallpaper),
+                                cx.theme().wallpaper_scale,
+                                cx.theme().wallpaper_offset_x.unwrap_or(0.0),
+                                cx.theme().wallpaper_offset_y.unwrap_or(0.0),
+                                cx.theme().wallpaper_anchor.as_ref().map(|s| s.to_string()),
+                                cx.theme().wallpaper_opacity.unwrap_or(0.25),
+                            )
+                        })
+                    }
+                } else {
+                    None
+                };
+                Self::evict_stale_wallpaper_asset(
+                    wallpaper.as_ref().map(|(resource, ..)| resource),
+                    cx,
+                );
+                if let Some((resource, scale, offset_x, offset_y, anchor, opacity)) = wallpaper {
                     if let Some(Ok(image)) =
                         window.use_asset::<gpui::ImgResourceLoader>(&resource, cx)
                     {
                         if image.frame_count() > 0 {
                             let editor_bounds = layout.position_map.text_hitbox.bounds;
-                            let image_bounds = if let Some(scale) = cx.theme().wallpaper_scale {
+                            let image_bounds = if let Some(scale) = scale {
                                 let scale = scale.clamp(0.05, 1.0);
                                 let img_size = image.size(0);
                                 let max_w = editor_bounds.size.width * scale;
@@ -4960,9 +5009,7 @@ impl EditorElement {
                                     (max_h * aspect, max_h)
                                 };
                                 let x = editor_bounds.origin.x + editor_bounds.size.width - w;
-                                let y = if cx.theme().wallpaper_anchor.as_deref()
-                                    == Some("top-right")
-                                {
+                                let y = if anchor.as_deref() == Some("top-right") {
                                     editor_bounds.origin.y
                                 } else {
                                     editor_bounds.origin.y + editor_bounds.size.height - h
@@ -4977,8 +5024,6 @@ impl EditorElement {
                                     image.size(0),
                                 )
                             };
-                            let offset_x = cx.theme().wallpaper_offset_x.unwrap_or(0.0);
-                            let offset_y = cx.theme().wallpaper_offset_y.unwrap_or(0.0);
                             let image_bounds = if offset_x != 0.0 || offset_y != 0.0 {
                                 gpui::Bounds {
                                     origin: gpui::Point {
@@ -5019,7 +5064,6 @@ impl EditorElement {
                                 0
                             };
 
-                            let opacity = cx.theme().wallpaper_opacity.unwrap_or(0.25);
                             window.with_element_opacity(Some(opacity), |window| {
                                 window
                                     .paint_image(

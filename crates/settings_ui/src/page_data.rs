@@ -1546,6 +1546,84 @@ fn appearance_page() -> SettingsPage {
         ]
     }
 
+    fn wallpaper_section() -> [SettingsPageItem; 6] {
+        [
+            SettingsPageItem::SectionHeader("Wallpaper"),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Enable Wallpaper",
+                description: "Master switch. When off, no wallpaper is ever shown, regardless of the settings below.",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("wallpaper_enabled"),
+                    pick: |settings_content| settings_content.editor.wallpaper_enabled.as_ref(),
+                    write: |settings_content, value, _| {
+                        settings_content.editor.wallpaper_enabled = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Pin Wallpaper Across Themes",
+                description: "On: locks in one wallpaper — \"Pinned Theme\"'s built-in image if set, else \"Wallpaper Path\" — the same one no matter which theme you pick. Off (default): both are ignored and each theme shows its own built-in wallpaper — a different image per theme, as before.",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("wallpaper_pinned"),
+                    pick: |settings_content| settings_content.editor.wallpaper_pinned.as_ref(),
+                    write: |settings_content, value, _| {
+                        settings_content.editor.wallpaper_pinned = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Pinned Theme",
+                description: "Name of the theme whose built-in wallpaper to keep showing while \"Pin Wallpaper Across Themes\" is on. Set automatically when pinning from the theme browser; takes priority over \"Wallpaper Path\".",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("wallpaper_pinned_theme"),
+                    pick: |settings_content| {
+                        settings_content.editor.wallpaper_pinned_theme.as_ref()
+                    },
+                    write: |settings_content, value, _| {
+                        settings_content.editor.wallpaper_pinned_theme = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Wallpaper Path",
+                description: "Path to a custom wallpaper image on disk. Used while \"Pin Wallpaper Across Themes\" is on and \"Pinned Theme\" is unset or not found.",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("wallpaper"),
+                    pick: |settings_content| settings_content.editor.wallpaper.as_ref(),
+                    write: |settings_content, value, _| {
+                        settings_content.editor.wallpaper = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+            SettingsPageItem::SettingItem(SettingItem {
+                title: "Wallpaper Opacity",
+                description: "Opacity (0.0-1.0) at which the wallpaper is painted.",
+                field: Box::new(SettingField {
+                    organization_override: None,
+                    json_path: Some("wallpaper_opacity"),
+                    pick: |settings_content| settings_content.editor.wallpaper_opacity.as_ref(),
+                    write: |settings_content, value, _| {
+                        settings_content.editor.wallpaper_opacity = value;
+                    },
+                }),
+                metadata: None,
+                files: USER,
+            }),
+        ]
+    }
+
     let items: Box<[SettingsPageItem]> = concat_sections!(
         theme_section(),
         theme_browser_section(),
@@ -1557,6 +1635,7 @@ fn appearance_page() -> SettingsPage {
         cursor_section(),
         highlighting_section(),
         guides_section(),
+        wallpaper_section(),
     );
 
     SettingsPage {
