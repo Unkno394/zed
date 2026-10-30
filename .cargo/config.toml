@@ -1,7 +1,9 @@
 [build]
+incremental = false
+
+[target.'cfg(all())']
 # v0 mangling scheme provides more detailed backtraces around closures
 rustflags = ["-C", "symbol-mangling-version=v0", "--cfg", "tokio_unstable"]
-incremental = false
 
 [alias]
 xtask = "run --package xtask --"
@@ -22,7 +24,7 @@ rustflags = [
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [env]
-MACOSX_DEPLOYMENT_TARGET = "10.15.7"
+MACOSX_DEPLOYMENT_TARGET = "12.0"
 
 [net]
 # libgit2's bundled TLS doesn't trust the macOS keychain CA store, which has

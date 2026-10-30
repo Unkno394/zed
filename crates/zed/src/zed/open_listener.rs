@@ -329,8 +329,7 @@ fn parse_ssh_url(url: &str) -> Result<url::Url> {
     // They are unsupported by Url::parse, but can be normalized into a Url.
     //   SCPUrl("ssh://user@host:~/relpath") => Url("ssh://user@host/~/relpath")
     //   SCPUrl("ssh://user@host:/abs/path") => Url("ssh://user@host/abs/path")
-    //
-    // TODO: Add IPv6 support: "ssh://[2600::]:~/foo"
+    //   SCPUrl("ssh://[2600::]:~/foo") => Url("ssh://[2600::]/~/foo")
     let ssh_target = url
         .strip_prefix("ssh://")
         .with_context(|| format!("invalid ssh url: {url}"))?;
@@ -347,7 +346,7 @@ fn parse_ssh_url(url: &str) -> Result<url::Url> {
         .rsplit_once('@')
         .map_or((None, authority), |(userinfo, host)| (Some(userinfo), host));
     anyhow::ensure!(
-        !host.is_empty() && !host.starts_with('[') && !host.contains(':'),
+        !host.is_empty() && url::Host::parse(host).is_ok(),
         "invalid ssh url: {url}"
     );
 
@@ -801,9 +800,7 @@ pub(crate) fn open_options_for_behavior(
 
     // If reuse flag is passed, open a new workspace in an existing window.
     let requesting_window = if open_behavior == cli::OpenBehavior::Reuse {
-        workspace::workspace_windows_for_location(location, cx)
-            .into_iter()
-            .next()
+        workspace::workspace_windows_for_location(location, cx).next()
     } else {
         None
     };
@@ -1235,6 +1232,38 @@ mod tests {
                 None,
                 "/project",
             ),
+            (
+                "ssh://[2600::]:~/foo",
+                Some("ssh://[2600::]/~/foo"),
+                "2600::",
+                None,
+                None,
+                "/~/foo",
+            ),
+            (
+                "ssh://me@[2001:db8::1]:~/project",
+                Some("ssh://me@[2001:db8::1]/~/project"),
+                "2001:db8::1",
+                Some("me"),
+                None,
+                "/~/project",
+            ),
+            (
+                "ssh://me@[::1]:/tmp/file",
+                Some("ssh://me@[::1]/tmp/file"),
+                "::1",
+                Some("me"),
+                None,
+                "/tmp/file",
+            ),
+            (
+                "ssh://[2001:db8::2]:2222/tmp",
+                Some("ssh://[2001:db8::2]:2222/tmp"),
+                "2001:db8::2",
+                None,
+                Some(2222),
+                "/tmp",
+            ),
         ];
 
         for (input, expected_url, host, username, port, path) in cases {
@@ -1362,7 +1391,8 @@ mod tests {
         for input in [
             "ssh://me@localhost:code/vibes/mine-bot",
             "ssh://me@localhost:2222:~/project",
-            "ssh://me@[2001:db8::1]:~/project",
+            "ssh://2600:::~/foo",
+            "ssh://[2600::]:2222:~/foo",
         ] {
             let result = cx.update(|cx| {
                 OpenRequest::parse(
@@ -2012,13 +2042,11 @@ mod tests {
         let window_to_replace = workspace::find_existing_workspace(
             &paths,
             &workspace::OpenOptions::default(),
-            &workspace::SerializedWorkspaceLocation::Local,
+            &project::ProjectHost::Local,
             &mut cx.to_async(),
         )
-        .await
-        .0
         .unwrap()
-        .0;
+        .window;
 
         let errored_reuse = cx
             .spawn({

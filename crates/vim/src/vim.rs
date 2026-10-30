@@ -987,6 +987,9 @@ impl Vim {
                     }
                     _ => {
                         vim.update_editor(cx, |_, editor, cx| editor.paste(&Paste, window, cx));
+                        if vim.mode == Mode::HelixSelect {
+                            vim.switch_mode(Mode::HelixNormal, true, window, cx);
+                        }
                     }
                 },
             );
@@ -1538,6 +1541,12 @@ impl Vim {
         {
             context.add("VimControl");
         }
+        // `vim_mode` is replaced by "operator"/"waiting" while an operator is
+        // pending, so expose helix-ness separately to allow Helix-specific
+        // bindings in those states (e.g. text objects after `mi`/`ma`).
+        if self.mode.is_helix() {
+            context.add("helix_mode");
+        }
         context.set("vim_mode", mode);
         context.set("vim_operator", operator_id);
     }
@@ -2015,7 +2024,7 @@ impl Vim {
             return;
         }
 
-        let newest = editor.read(cx).selections.newest_anchor().clone();
+        let newest = *editor.read(cx).selections.newest_anchor();
         let is_multicursor = editor.read(cx).selections.count() > 1;
         if self.mode == Mode::Insert && self.current_tx.is_some() {
             if let Some(current_anchor) = &self.current_anchor {

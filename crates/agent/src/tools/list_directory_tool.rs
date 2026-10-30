@@ -3,7 +3,7 @@ use super::tool_permissions::{
     resolve_global_skill_path, resolve_project_path,
 };
 use crate::{AgentTool, ToolCallEventStream, ToolInput};
-use agent_client_protocol::schema::v1 as acp;
+use agent_client_protocol::schema::v2 as acp;
 use anyhow::{Context as _, Result, anyhow};
 use fs::Fs;
 use futures::StreamExt as _;
@@ -342,7 +342,7 @@ mod tests {
     use indoc::indoc;
     use project::{FakeFs, Project};
     use serde_json::json;
-    use settings::SettingsStore;
+    use settings::{SettingsStore, SplicingVec};
     use std::path::PathBuf;
     use util::path;
 
@@ -578,11 +578,11 @@ mod tests {
         cx.update(|cx| {
             SettingsStore::update_global(cx, |store, cx| {
                 store.update_user_settings(cx, |settings| {
-                    settings.project.worktree.file_scan_exclusions = Some(vec![
+                    settings.project.worktree.file_scan_exclusions = Some(SplicingVec::from(vec![
                         "**/.secretdir".to_string(),
                         "**/.mymetadata".to_string(),
                         "**/.hidden_subdir".to_string(),
-                    ]);
+                    ]));
                     settings.project.worktree.private_files = Some(
                         vec![
                             "**/.mysecrets".to_string(),
@@ -740,8 +740,10 @@ mod tests {
         cx.update(|cx| {
             SettingsStore::update_global(cx, |store, cx| {
                 store.update_user_settings(cx, |settings| {
-                    settings.project.worktree.file_scan_exclusions =
-                        Some(vec!["**/.git".to_string(), "**/node_modules".to_string()]);
+                    settings.project.worktree.file_scan_exclusions = Some(SplicingVec::from(vec![
+                        "**/.git".to_string(),
+                        "**/node_modules".to_string(),
+                    ]));
                     settings.project.worktree.private_files =
                         Some(vec!["**/.env".to_string()].into());
                 });
@@ -910,7 +912,11 @@ mod tests {
         });
 
         let auth = event_rx.expect_authorization().await;
-        let title = auth.tool_call.fields.title.as_deref().unwrap_or("");
+        let title = auth
+            .tool_call
+            .title
+            .value()
+            .expect("expected authorization title");
         assert!(
             title.contains("points outside the project"),
             "Authorization title should mention symlink escape, got: {title}",

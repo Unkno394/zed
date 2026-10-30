@@ -468,8 +468,10 @@ impl WorktreeStore {
         let abs_path = SanitizedPath::new(abs_path.as_ref());
         for tree in self.worktrees() {
             let path_style = tree.read(cx).path_style();
-            if let Some(relative_path) =
-                path_style.strip_prefix(abs_path.as_ref(), tree.read(cx).abs_path().as_ref())
+            if let Some(relative_path) = path_style
+                .strip_prefix(abs_path.as_ref(), tree.read(cx).abs_path().as_ref())
+                .ok()
+                .and_then(|path| RelPath::new(path, path_style).ok())
             {
                 return Some((tree.clone(), relative_path.into_arc()));
             }
@@ -797,27 +799,21 @@ impl WorktreeStore {
                 }
             };
 
-            self.loading_worktrees
-                .insert(abs_path.clone(), task.shared());
+            let loading_task = cx.spawn({
+                let abs_path = abs_path.clone();
+                async move |this, cx| {
+                    let result = task.await;
+                    this.update(cx, |this, cx| {
+                        this.loading_worktrees.remove(&abs_path);
+                        if !visible || !this.scanning_enabled || result.is_err() {
+                            this.update_initial_scan_state(cx);
+                        }
+                    })
+                    .ok();
 
-            if visible && self.scanning_enabled {
-                *self.initial_scan_complete.0.borrow_mut() = false;
-            }
-        }
-        let task = self.loading_worktrees.get(&abs_path).unwrap().clone();
-        cx.spawn(async move |this, cx| {
-            let result = task.await;
-            this.update(cx, |this, cx| {
-                this.loading_worktrees.remove(&abs_path);
-                if !visible || !this.scanning_enabled || result.is_err() {
-                    this.update_initial_scan_state(cx);
-                }
-            })
-            .ok();
-
-            match result {
-                Ok(worktree) => {
-                    if !is_via_collab {
+                    if let Ok(worktree) = &result
+                        && !is_via_collab
+                    {
                         if let Some((trusted_worktrees, worktree_store)) = this
                             .update(cx, |_, cx| {
                                 TrustedWorktrees::try_get_global(cx).zip(Some(cx.entity()))
@@ -836,16 +832,25 @@ impl WorktreeStore {
 
                         this.update(cx, |this, cx| {
                             if this.scanning_enabled && visible {
-                                this.observe_worktree_scan_completion(&worktree, cx);
+                                this.observe_worktree_scan_completion(worktree, cx);
                             }
                         })
                         .ok();
                     }
-                    Ok(worktree)
+
+                    result
                 }
-                Err(err) => Err((*err).cloned()),
+            });
+
+            self.loading_worktrees
+                .insert(abs_path.clone(), loading_task.shared());
+
+            if visible && self.scanning_enabled {
+                *self.initial_scan_complete.0.borrow_mut() = false;
             }
-        })
+        }
+        let task = self.loading_worktrees.get(&abs_path).unwrap().clone();
+        cx.background_spawn(async move { task.await.map_err(|error| (*error).cloned()) })
     }
 
     fn create_remote_worktree(
@@ -1015,6 +1020,7 @@ impl WorktreeStore {
     }
 
     pub fn remove_worktree(&mut self, id_to_remove: WorktreeId, cx: &mut Context<Self>) {
+        let mut removed = false;
         self.worktrees.retain(|worktree| {
             if let Some(worktree) = worktree.upgrade() {
                 if worktree.read(cx).id() == id_to_remove {
@@ -1022,6 +1028,7 @@ impl WorktreeStore {
                         worktree.entity_id(),
                         id_to_remove,
                     ));
+                    removed = true;
                     false
                 } else {
                     true
@@ -1030,6 +1037,14 @@ impl WorktreeStore {
                 false
             }
         });
+        // A remote client asks to remove a worktree whenever it releases a
+        // handle to it, which can happen again after the worktree is gone.
+        // Announcing the unchanged worktrees in response would make the
+        // client re-create and release handles for the ones it has dropped
+        // in the meantime, and send us even more removal requests.
+        if !removed {
+            return;
+        }
         self.update_initial_scan_state(cx);
         self.send_project_updates(cx);
     }
@@ -1484,7 +1499,7 @@ impl WorktreeStore {
                 let main_path = snapshot
                     .root_repo_common_dir()
                     .filter(|dir| !crate::git_store::is_submodule_git_dir(dir))
-                    .map(|dir| crate::git_store::repo_identity_path(dir))
+                    .map(|dir| crate::git_store::repo_identity_path(dir, snapshot.path_style()))
                     .filter(|repo_path| {
                         snapshot.root_repo_is_linked_worktree()
                             || *repo_path == folder_path.as_path()

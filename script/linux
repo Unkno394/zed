@@ -25,7 +25,11 @@ function add_ubuntu_toolchain_r_ppa {
   fi
   $maysudo "$apt" install -y curl gnupg
   codename=$(lsb_release -cs)
-  echo "deb https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu $codename main" | \
+  printf '%s\tpriority:%s\n' \
+    'https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu' 1 \
+    'http://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu' 2 | \
+    $maysudo tee /etc/apt/ubuntu-toolchain-r-test.mirrors > /dev/null
+  echo "deb mirror+file:/etc/apt/ubuntu-toolchain-r-test.mirrors $codename main" | \
     $maysudo tee /etc/apt/sources.list.d/ubuntu-toolchain-r-test.list > /dev/null
   curl -fsSL 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x1E9377A2BA9EF27F' | \
     sed -n '/-----BEGIN PGP PUBLIC KEY BLOCK-----/,/-----END PGP PUBLIC KEY BLOCK-----/p' | \
@@ -82,9 +86,10 @@ if [[ -n $apt ]]; then
     # use libstdc++ (not libc++) to avoid ABI mismatches at link time.
 
     # libstdc++-11-dev (headers with working pointer_traits/contiguous_range)
-    # is only available from the ubuntu-toolchain-r PPA.
+    # is only available from the ubuntu-toolchain-r PPA. Add its mirror before
+    # installing clang because Launchpad's HTTPS frontend can return 503.
     add_ubuntu_toolchain_r_ppa
-    deps+=( clang-18 libstdc++-11-dev )
+    deps+=( clang-18 lld-18 libstdc++-11-dev )
   fi
 
   # The prebuilt libwebrtc.a's libyuv includes an ARM SME-optimized rotate
@@ -125,6 +130,7 @@ if [[ -n $dnf ]] || [[ -n $yum ]]; then
     musl-gcc
     gcc
     clang
+    lld
     cmake
     alsa-lib-devel
     fontconfig-devel
@@ -191,6 +197,7 @@ if [[ -n $zyp ]]; then
   deps=(
     alsa-devel
     clang
+    lld
     cmake
     fontconfig-devel
     gcc
@@ -201,7 +208,7 @@ if [[ -n $zyp ]]; then
     gzip
     jq
     libvulkan1
-    libx11-devel
+    libX11-devel
     libxcb-devel
     libxkbcommon-devel
     libxkbcommon-x11-devel
@@ -227,6 +234,7 @@ if [[ -n $pacman ]]; then
   deps=(
     gcc
     clang
+    lld
     musl
     cmake
     alsa-lib
@@ -237,6 +245,7 @@ if [[ -n $pacman ]]; then
     libgit2
     libxcb
     libxkbcommon-x11
+    llvm
     openssl
     zstd
     pkgconf
@@ -258,6 +267,7 @@ if [[ -n $xbps ]]; then
   deps=(
     gettext-devel
     clang
+    lld
     cmake
     jq
     elfutils-devel
@@ -292,6 +302,7 @@ if [[ -n $emerge ]]; then
     dev-libs/openssl
     dev-libs/wayland
     dev-build/cmake
+    llvm-core/lld
     media-libs/alsa-lib
     media-libs/fontconfig
     media-libs/libva
