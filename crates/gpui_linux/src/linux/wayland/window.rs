@@ -624,7 +624,7 @@ impl WaylandWindowState {
             scale: 1.0,
             input_handler: None,
             decorations: WindowDecorations::Client,
-            background_appearance: WindowBackgroundAppearance::Opaque,
+            background_appearance: options.window_background,
             fullscreen: false,
             maximized: false,
             visibility: WindowVisibility::Visible,
@@ -889,6 +889,8 @@ impl WaylandWindow {
             frame_ping,
             scheduled_frame_at: Rc::new(Cell::new(None)),
         });
+
+        update_window(this.borrow_mut());
 
         // Kick things off
         surface.commit();

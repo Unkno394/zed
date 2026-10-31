@@ -5116,6 +5116,15 @@ impl EditorElement {
         });
     }
 
+    fn theme_wallpaper_resource(path: gpui::SharedString) -> gpui::Resource {
+        let file_path = std::path::Path::new(path.as_ref());
+        if file_path.is_absolute() {
+            gpui::Resource::Path(file_path.into())
+        } else {
+            gpui::Resource::Embedded(path)
+        }
+    }
+
     fn paint_background(&self, layout: &EditorLayout, window: &mut Window, cx: &mut App) {
         window.paint_layer(layout.hitbox.bounds, |window| {
             let scroll_top = layout.position_map.scroll_position.y;
@@ -5138,7 +5147,7 @@ impl EditorElement {
                         if let Some(pinned_theme) = pinned_theme.as_ref() {
                             pinned_theme.wallpaper.clone().map(|theme_wallpaper| {
                                 (
-                                    gpui::Resource::Embedded(theme_wallpaper),
+                                    Self::theme_wallpaper_resource(theme_wallpaper),
                                     pinned_theme.wallpaper_scale,
                                     pinned_theme.wallpaper_offset_x.unwrap_or(0.0),
                                     pinned_theme.wallpaper_offset_y.unwrap_or(0.0),
@@ -5163,7 +5172,7 @@ impl EditorElement {
                     } else {
                         cx.theme().wallpaper.clone().map(|theme_wallpaper| {
                             (
-                                gpui::Resource::Embedded(theme_wallpaper),
+                                Self::theme_wallpaper_resource(theme_wallpaper),
                                 cx.theme().wallpaper_scale,
                                 cx.theme().wallpaper_offset_x.unwrap_or(0.0),
                                 cx.theme().wallpaper_offset_y.unwrap_or(0.0),
@@ -5225,29 +5234,32 @@ impl EditorElement {
                             };
                             let frame_count = image.frame_count();
                             let frame_index = if frame_count > 1 {
-                                let total_delay: std::time::Duration = (0..frame_count)
-                                    .map(|i| std::time::Duration::from(image.delay(i)))
-                                    .sum();
-                                if total_delay.is_zero() {
-                                    0
-                                } else {
-                                    let elapsed_in_loop = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_nanos()
-                                        % total_delay.as_nanos().max(1);
-                                    let mut accumulated = 0u128;
-                                    let mut index = 0;
-                                    for i in 0..frame_count {
-                                        accumulated +=
-                                            std::time::Duration::from(image.delay(i)).as_nanos();
-                                        if elapsed_in_loop < accumulated {
-                                            index = i;
-                                            break;
-                                        }
+                                let frame_delay = |index| {
+                                    let delay = std::time::Duration::from(image.delay(index));
+                                    if delay.is_zero() {
+                                        std::time::Duration::from_millis(100)
+                                    } else {
+                                        delay
                                     }
-                                    index
+                                };
+                                let total_delay: std::time::Duration = (0..frame_count)
+                                    .map(frame_delay)
+                                    .sum();
+                                let elapsed_in_loop = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_default()
+                                    .as_nanos()
+                                    % total_delay.as_nanos();
+                                let mut accumulated = 0u128;
+                                let mut index = 0;
+                                for i in 0..frame_count {
+                                    accumulated += frame_delay(i).as_nanos();
+                                    if elapsed_in_loop < accumulated {
+                                        index = i;
+                                        break;
+                                    }
                                 }
+                                index
                             } else {
                                 0
                             };

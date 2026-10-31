@@ -2745,6 +2745,9 @@ pub struct WindowParams {
     #[cfg_attr(feature = "wayland", allow(dead_code))]
     pub app_id: Option<String>,
 
+    /// The appearance of the window background.
+    pub window_background: WindowBackgroundAppearance,
+
     pub window_min_size: Option<Size<Pixels>>,
 
     #[cfg(target_os = "macos")]

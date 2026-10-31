@@ -16416,6 +16416,7 @@ dependencies = [
  "heck 0.5.0",
  "http_client",
  "http_proxy",
+ "image",
  "itertools 0.14.0",
  "language",
  "language_model",

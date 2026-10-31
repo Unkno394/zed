@@ -4,17 +4,17 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](./LICENSE-GPL)
 [![Latest release](https://img.shields.io/github/v/release/Unkno394/zed?style=flat-square)](https://github.com/Unkno394/zed/releases)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-blue?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![Themes](https://img.shields.io/badge/themes-113-blue?style=flat-square)](#-themes)
+[![Themes](https://img.shields.io/badge/themes-136-blue?style=flat-square)](#-themes)
 
 Zed Aura is a fork of [Zed](https://github.com/zed-industries/zed), the
 high-performance multiplayer code editor from the creators of
 [Atom](https://github.com/atom/atom) and
 [Tree-sitter](https://github.com/tree-sitter/tree-sitter). It adds editor
 wallpapers (including animated GIF wallpapers), window transparency, and a
-theme browser UI, on top of a curated pack of 113 themes — all built
-directly into GPUI, the editor's own GPU-backed rendering pipeline, rather
-than layered on top as a plugin. Wallpaper decoding is cache-evicted on
-theme switch so idle memory use doesn't grow the longer a session runs.
+theme browser UI, alongside 136 bundled themes. Wallpapers render through
+GPUI, the editor's own GPU-backed rendering pipeline, rather than through a
+plugin. Decoded images from previous themes are evicted when themes change,
+so browsing does not accumulate their image data in memory.
 
 ## Table of contents
 
@@ -137,7 +137,7 @@ at partial opacity. Theme fields (set in the theme's JSON file):
 
 | Field | Description |
 |---|---|
-| `wallpaper` | Path to the PNG/JPG drawn behind the editor |
+| `wallpaper` | Embedded asset path or absolute PNG, JPG, WebP, or GIF path drawn behind the editor |
 | `wallpaper_scale` | Image scale (0.0–1.0) relative to the editor size |
 | `wallpaper_offset_x` / `wallpaper_offset_y` | Pixel offset of the image |
 | `wallpaper_anchor` | Which corner of the editor the image is anchored to |
@@ -245,10 +245,9 @@ Code: `crates/settings_ui/src/pages/theme_browser.rs`,
 
 ## ▪ Themes
 
-Themes themselves are **not bundled in this repository** — Zed loads user
-themes from `~/.config/zed/themes/`. This fork was developed against
-`~/.config/zed/themes/doki-theme.json`, a set of **113 themes** built on top
-of [doki-theme](https://github.com/doki-theme/doki-theme):
+Theme families are bundled in `assets/themes/`; Zed also loads user themes
+from `~/.config/zed/themes/`. The bundled Doki collection has **113 themes**
+built on top of [doki-theme](https://github.com/doki-theme/doki-theme):
 
 - **90 dark** themes, **23 light** themes.
 - Every theme carries a wallpaper; **4** of them are animated (GIF)
@@ -259,6 +258,55 @@ of [doki-theme](https://github.com/doki-theme/doki-theme):
   `assets/images/backgrounds/doki/` in this repository).
 - A handful of themes were hand-assembled for this fork rather than taken
   from upstream doki-theme.
+
+### Wallpaper Atelier
+
+The `Wallpaper Atelier` family adds one named theme for every image in the
+`Для проекта` collection: four static images and eight animated GIFs. Choose
+one under **Themes → Browse Themes**, then turn on **Enable Wallpaper** in the
+browser if wallpapers are disabled in settings (the master switch defaults to
+`false`).
+
+The two video GIFs omit long, identical trailing frames from their sources so
+they loop without a pause. Blue Screen Reverie keeps 151 moving frames and
+Misty Meadow keeps 215. Animated wallpapers hold their decoded frames in memory
+while active, so these still use more memory than the shorter animations.
+
+| Theme | Source image | Format |
+|---|---|---|
+| Cyan Circuit | `Киберпанк-циборг на мокром металле.png` | PNG |
+| Thousand Eyes | `Монохромная манга_ девушка и кластер глаз.png` | PNG |
+| CRT Oracle | `Неоновая ASCII-мишень в терминале.png` | PNG |
+| Velvet Paws | `Лапки кошек на тёмном стекле.png` | PNG |
+| Scarlet Fields | `gif_0452b7f55204.gif` | GIF |
+| Sakura Rain | `gif_df7fcbfa4564.gif` | GIF |
+| Silver Lotus | `gif_c966c37f1ebe.gif` | GIF |
+| Moonflower | `gif_89c3c963641b.gif` | GIF |
+| Tidal Ink | `gif_c2d189d1ffc6.gif` | GIF |
+| Windborne Ink | `gif_52ff6215e7fb.gif` | GIF |
+| Blue Screen Reverie | `video_91ea53ce06df (online-video-cutter.com).gif` | GIF |
+| Misty Meadow | `video_ab99956c9bd8 (online-video-cutter.com).gif` | GIF |
+
+### Create a local wallpaper theme
+
+Open **Themes → Browse Themes**. In **Create a wallpaper theme**, choose a color
+palette from the dropdown without changing the active editor theme. The list
+includes only themes without wallpaper, from built-in, installed extension, and
+local themes. Optionally enter a name and confirm it,
+then choose a PNG, JPEG, WebP, or GIF. Zed copies the image to its local profile,
+creates a theme with the selected colors, enables wallpapers, and selects the
+new theme. Animated GIFs play behind the editor; the browser uses a small still
+preview for user-added GIFs.
+
+When a local wallpaper theme is active, selecting another palette updates its
+colors immediately and saves the choice in that theme's JSON. The wallpaper stays
+in place.
+
+The generated theme JSON lives in `~/.config/zed/themes/` on Linux, and its
+image copy lives in `~/.config/zed/wallpapers/`. Open the JSON in Zed to edit
+colors, opacity, or wallpaper placement; Zed reloads the theme when the file
+changes. These paths follow Zed's configured profile directory on other
+platforms.
 
 ### Using a theme
 

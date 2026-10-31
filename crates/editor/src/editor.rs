@@ -12349,22 +12349,22 @@ impl Editor {
 
     pub fn start_fireflies(&mut self, cx: &mut Context<Self>) {
         if self.firefly_particles.is_empty() {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             self.firefly_particles = (0..35)
                 .map(|_| {
-                    let hue = rng.gen_range(0.08f32..0.18f32);
+                    let hue = rng.random_range(0.08f32..0.18f32);
                     let (r, g, b) = hsl_to_rgb(hue, 0.9, 0.75);
                     FireflyParticle {
-                        x: rng.gen_range(0.0f32..1.0f32),
-                        y: rng.gen_range(0.0f32..1.0f32),
-                        vx: rng.gen_range(-0.015f32..0.015f32),
-                        vy: rng.gen_range(-0.015f32..0.015f32),
-                        opacity: rng.gen_range(0.0f32..1.0f32),
-                        pulse_phase: rng.gen_range(0.0f32..std::f32::consts::TAU),
-                        pulse_speed: rng.gen_range(0.8f32..2.0f32),
-                        wander_phase: rng.gen_range(0.0f32..std::f32::consts::TAU),
-                        wander_speed: rng.gen_range(0.3f32..0.9f32),
-                        size: rng.gen_range(1.5f32..3.5f32),
+                        x: rng.random_range(0.0f32..1.0f32),
+                        y: rng.random_range(0.0f32..1.0f32),
+                        vx: rng.random_range(-0.015f32..0.015f32),
+                        vy: rng.random_range(-0.015f32..0.015f32),
+                        opacity: rng.random_range(0.0f32..1.0f32),
+                        pulse_phase: rng.random_range(0.0f32..std::f32::consts::TAU),
+                        pulse_speed: rng.random_range(0.8f32..2.0f32),
+                        wander_phase: rng.random_range(0.0f32..std::f32::consts::TAU),
+                        wander_speed: rng.random_range(0.3f32..0.9f32),
+                        size: rng.random_range(1.5f32..3.5f32),
                         color: (r, g, b),
                     }
                 })

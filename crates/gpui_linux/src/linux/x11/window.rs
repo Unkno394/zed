@@ -850,7 +850,7 @@ impl X11WindowState {
                 hidden: false,
                 appearance,
                 handle,
-                background_appearance: WindowBackgroundAppearance::Opaque,
+                background_appearance: params.window_background,
                 client_side_decorations_supported,
                 decorations: WindowDecorations::Server,
                 last_insets: [0, 0, 0, 0],

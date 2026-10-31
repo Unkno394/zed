@@ -1684,6 +1684,7 @@ impl Window {
                 focus,
                 show,
                 display_id,
+                window_background,
                 window_min_size,
                 app_id: app_id.clone(),
                 icon,
